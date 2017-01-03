@@ -1,0 +1,137 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <ClCompile Include="main.cpp" />
+    <ClCompile Include="OpenGlErrorHandling.cpp" />
+    <ClCompile Include="ParticleEmitterPoint.cpp">
+      <Filter>Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleEmitterBar.cpp">
+      <Filter>Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="MinMaxVelocity.cpp" />
+    <ClCompile Include="RandomToast.cpp" />
+    <ClCompile Include="ShaderStorage.cpp">
+      <Filter>Shaders</Filter>
+    </ClCompile>
+    <ClCompile Include="FreeTypeAtlas.cpp">
+      <Filter>RenderFrameRate</Filter>
+    </ClCompile>
+    <ClCompile Include="FreeTypeEncapsulated.cpp">
+      <Filter>RenderFrameRate</Filter>
+    </ClCompile>
+    <ClCompile Include="Stopwatch.cpp">
+      <Filter>RenderFrameRate</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleSsbo.cpp">
+      <Filter>Buffers</Filter>
+    </ClCompile>
+    <ClCompile Include="SsboBase.cpp">
+      <Filter>Buffers</Filter>
+    </ClCompile>
+    <ClCompile Include="PolygonSsbo.cpp">
+      <Filter>Buffers</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticlePolygonRegion.cpp">
+      <Filter>Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="ComputeParticleUpdate.cpp">
+      <Filter>Particles</Filter>
+    </ClCompile>
+    <ClCompile Include="ComputeParticleReset.cpp">
+      <Filter>Particles</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="OpenGlErrorHandling.h" />
+    <ClInclude Include="Particle.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="IParticleEmitter.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleEmitterPoint.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleEmitterBar.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="ShaderStorage.h">
+      <Filter>Shaders</Filter>
+    </ClInclude>
+    <ClInclude Include="MinMaxVelocity.h" />
+    <ClInclude Include="RandomToast.h" />
+    <ClInclude Include="FreeTypeAtlas.h">
+      <Filter>RenderFrameRate</Filter>
+    </ClInclude>
+    <ClInclude Include="FreeTypeEncapsulated.h">
+      <Filter>RenderFrameRate</Filter>
+    </ClInclude>
+    <ClInclude Include="Stopwatch.h">
+      <Filter>RenderFrameRate</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleSsbo.h">
+      <Filter>Buffers</Filter>
+    </ClInclude>
+    <ClInclude Include="PolygonFace.h" />
+    <ClInclude Include="SsboBase.h">
+      <Filter>Buffers</Filter>
+    </ClInclude>
+    <ClInclude Include="MyVertex.h" />
+    <ClInclude Include="PolygonSsbo.h">
+      <Filter>Buffers</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticlePolygonRegion.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeParticleReset.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeParticleUpdate.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="geometry.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="geometry.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="particleRender.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="particleRender.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="freeType.frag">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="freeType.vert">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="particlePolygonRegion.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="particleReset.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="particleUpdate.comp">
+      <Filter>Shaders</Filter>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="Particles">
+      <UniqueIdentifier>{813cac0c-eb2b-4bd3-9cb6-86d2ba9bb2a2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{888165dd-9b93-4108-b23e-0c57b4ac9561}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="RenderFrameRate">
+      <UniqueIdentifier>{2e6cc6b5-9657-45b5-bcf9-ec3208c12d32}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Buffers">
+      <UniqueIdentifier>{a3e1fffa-b362-4527-9368-9305fcca5aec}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>
