@@ -247,3 +247,6 @@ _Pvt_Extensions
 .idea/
 *.sln.iml
 *.db
+*.am
+freeglut/include/GL/Makefile.in
+*.in
