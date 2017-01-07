@@ -176,9 +176,13 @@
   <ItemGroup>
     <ClInclude Include="ComputeParticleReset.h" />
     <ClInclude Include="ComputeParticleUpdate.h" />
+    <ClInclude Include="ComputeQuadTreeParticleCollisions.h" />
+    <ClInclude Include="ComputeQuadTreePopulate.h" />
+    <ClInclude Include="ComputeQuadTreeReset.h" />
     <ClInclude Include="FreeTypeAtlas.h" />
     <ClInclude Include="FreeTypeEncapsulated.h" />
     <ClInclude Include="MyVertex.h" />
+    <ClInclude Include="ParticleQuadTreeNode.h" />
     <ClInclude Include="PolygonSsbo.h" />
     <ClInclude Include="SsboBase.h" />
     <ClInclude Include="IParticleEmitter.h" />

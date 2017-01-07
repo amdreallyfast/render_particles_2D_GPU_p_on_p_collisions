@@ -84,6 +84,18 @@
     <ClInclude Include="ComputeParticleUpdate.h">
       <Filter>Particles</Filter>
     </ClInclude>
+    <ClInclude Include="ParticleQuadTreeNode.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeQuadTreeReset.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeQuadTreePopulate.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeQuadTreeParticleCollisions.h">
+      <Filter>Particles</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="geometry.frag">
@@ -126,6 +138,9 @@
     </Filter>
     <Filter Include="Buffers">
       <UniqueIdentifier>{a3e1fffa-b362-4527-9368-9305fcca5aec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="QuadTree">
+      <UniqueIdentifier>{e20e28db-53e8-45ba-bfd1-761ca3e677cd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
 </Project>
