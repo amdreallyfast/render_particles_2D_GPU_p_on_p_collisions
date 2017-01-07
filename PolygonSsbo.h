@@ -16,11 +16,8 @@ public:
     PolygonSsbo(const std::vector<PolygonFace> &faceCollection);
     virtual ~PolygonSsbo();
 
-    //void Init();
     void ConfigureCompute(unsigned int computeProgramId) override;
     void ConfigureRender(unsigned int renderProgramId, unsigned int drawStyle) override;
-
-    //void UpdateValues(const std::vector<PolygonFace> &faceCollection);
 
 private:
     unsigned int _bufferSizeBytes;

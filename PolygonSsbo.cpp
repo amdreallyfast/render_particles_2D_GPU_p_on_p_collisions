@@ -39,36 +39,6 @@ Creator: John Cox, 9-8-2016
 PolygonSsbo::~PolygonSsbo()
 {
 }
-//
-///*-----------------------------------------------------------------------------------------------
-//Description:
-//    Generates the SSBO and the VAO, but does not allocate space for them.  
-//    The SSBO is bound in ConfigureCompute(...) and sized/resized in UpdateValues(...).
-//    The VAO is initialized in ConfigureRender(...).
-//
-//    Note: MUST be called before calling ConfigureCompute(...) and ConfigureRender(...).
-//    Also Note: The buffers cannot be generated in the constructor unless the constructor is 
-//    initialized AFTER OpenGL's context is initialized.  If PolygonSsbo is used as a global 
-//    somewhere, then it will attempt initialization at program start, which is prior to OpenGL's
-//    context and the program will blow up.
-//Parameters: None
-//Returns:    None
-//Creator: John Cox, 11-24-2016
-//-----------------------------------------------------------------------------------------------*/
-//void PolygonSsbo::Init()
-//{
-//    if (_bufferId == 0)
-//    {
-//        glGenBuffers(1, &_bufferId);
-//        // do not allocate space; that happens at runtime with UpdateValues(...)
-//    }
-//    if (_vaoId == 0)
-//    {
-//        glGenVertexArrays(1, &_vaoId);
-//    }
-//
-//    _hasBeenInitialized = true;
-//}
 
 /*-----------------------------------------------------------------------------------------------
 Description:
@@ -83,12 +53,6 @@ Creator: John Cox, 11-24-2016
 -----------------------------------------------------------------------------------------------*/
 void PolygonSsbo::ConfigureCompute(unsigned int computeProgramId)
 {
-    //if (!_hasBeenInitialized)
-    //{
-    //    fprintf(stderr, "PolygonSsbo::ConfigureCompute(...) error: SSBO has not been initialized\n");
-    //    return;
-    //}
-
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, _bufferId);
 
     // see the corresponding area in ParticleSsbo::Init(...) for explanation
@@ -114,12 +78,6 @@ Creator: John Cox, 11-24-2016
 -----------------------------------------------------------------------------------------------*/
 void PolygonSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int drawStyle)
 {
-    //if (!_hasBeenInitialized)
-    //{
-    //    fprintf(stderr, "PolygonSsbo::ConfigureRender(...) error: SSBO has not been initialized\n");
-    //    return;
-    //}
-
     _drawStyle = drawStyle;
 
     // the render program is required for vertex attribute initialization or else the program WILL crash at runtime
@@ -157,44 +115,3 @@ void PolygonSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int dra
     glBindBuffer(GL_ARRAY_BUFFER, 0);
     glUseProgram(0);    // render program
 }
-//
-///*-----------------------------------------------------------------------------------------------
-//Description:
-//    Dumps the given collection of particle faces into the SSBO that is managed by this object.
-//    
-//    This is a convenience method for giving the compute shader an already-transformed array of 
-//    items to work with.  A simple transform could be passed into the compute shader, but then 
-//    every invocation of the sahder would have to transform the same faces with the same matrix.  
-//    Rather than duplicate load, I'll go out of my way to give the compute shader pre-transformed 
-//    values.
-//    
-//    Note: Do not pass in arrays of different sizes at runtime.  Just use a single array. This 
-//    SSBO object has no concept of the compute shader's contents, so it does not update the 
-//    compute shader's "num faces" uniform.  
-//Parameters:
-//    faceCollection  Self-explanatory
-//Returns:    None
-//Creator: John Cox, 10-10-2016
-//-----------------------------------------------------------------------------------------------*/
-//void PolygonSsbo::UpdateValues(const std::vector<PolygonFace> &faceCollection)
-//{
-//    // two vertices per face (used with glDrawArrays)
-//    _numVertices = faceCollection.size() * 2;
-//
-//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _bufferId);
-//    unsigned int byteCounter = sizeof(PolygonFace) * faceCollection.size();
-//    if (byteCounter > _bufferSizeBytes)
-//    {
-//        // re-allocate more space (yes, this is a crude resize, but its a demo)
-//        _bufferSizeBytes = byteCounter;
-//        glBufferData(GL_SHADER_STORAGE_BUFFER, _bufferSizeBytes, faceCollection.data(), GL_STATIC_DRAW);
-//    }
-//    else
-//    {
-//        glBufferSubData(GL_SHADER_STORAGE_BUFFER, 0, _bufferSizeBytes, faceCollection.data());
-//    }
-//
-//    // cleanup
-//    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-//}
-

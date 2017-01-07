@@ -18,7 +18,6 @@ public:
     ParticleSsbo(const std::vector<Particle> &allParticles);
     virtual ~ParticleSsbo();
     
-    //void Init(const std::vector<Particle> &allParticles);
     void ConfigureCompute(unsigned int computeProgramId) override;
     void ConfigureRender(unsigned int renderProgramId, unsigned int drawStyle) override;
 };

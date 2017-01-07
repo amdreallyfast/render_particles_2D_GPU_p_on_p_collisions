@@ -19,7 +19,6 @@ Returns:    None
 Creator: John Cox, 9-20-2016
 -----------------------------------------------------------------------------------------------*/
 SsboBase::SsboBase() :
-    //_hasBeenInitialized(false),
     _vaoId(0),
     _bufferId(0),
     _drawStyle(0),

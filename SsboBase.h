@@ -24,8 +24,6 @@ public:
 
 protected:
     // can't be private because the derived classes need to set them
-    
-    //bool _hasBeenInitialized;
 
     // save on the large header inclusion of OpenGL and write out these primitive types instead 
     // of using the OpenGL typedefs
