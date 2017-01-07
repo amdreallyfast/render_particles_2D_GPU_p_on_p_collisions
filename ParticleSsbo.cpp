@@ -156,6 +156,7 @@ void ParticleSsbo::ConfigureRender(unsigned int renderProgramId)
     unsigned int vertexArrayIndex = 0;
     unsigned int bufferStartOffset = 0;
     unsigned int bytesPerStep = sizeof(Particle);
+    unsigned int sizeOfLastItem = 0;
 
     // position
     GLenum itemType = GL_FLOAT;
@@ -163,24 +164,67 @@ void ParticleSsbo::ConfigureRender(unsigned int renderProgramId)
     glEnableVertexAttribArray(vertexArrayIndex);
     glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
         (void *)bufferStartOffset);
+    sizeOfLastItem = sizeof(Particle::_position);
 
     // velocity
     itemType = GL_FLOAT;
     numItems = sizeof(Particle::_velocity) / sizeof(float);
-    bufferStartOffset += sizeof(Particle::_position);
+    bufferStartOffset += sizeOfLastItem;
     vertexArrayIndex++;
     glEnableVertexAttribArray(vertexArrayIndex);
     glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
         (void *)bufferStartOffset);
+    sizeOfLastItem = sizeof(Particle::_velocity);
+
+    // net force
+    itemType = GL_FLOAT;
+    numItems = sizeof(Particle::_netForce) / sizeof(float);
+    bufferStartOffset += sizeOfLastItem;
+    vertexArrayIndex++;
+    glEnableVertexAttribArray(vertexArrayIndex);
+    glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
+        (void *)bufferStartOffset);
+    sizeOfLastItem = sizeof(Particle::_netForce);
+
+    // collision count this frame
+    itemType = GL_INT;
+    numItems = sizeof(Particle::_collisionCountThisFrame) / sizeof(int);
+    bufferStartOffset += sizeOfLastItem;
+    vertexArrayIndex++;
+    glEnableVertexAttribArray(vertexArrayIndex);
+    glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
+        (void *)bufferStartOffset);
+    sizeOfLastItem = sizeof(Particle::_collisionCountThisFrame);
+
+    // mass
+    itemType = GL_FLOAT;
+    numItems = sizeof(Particle::_mass) / sizeof(float);
+    bufferStartOffset += sizeOfLastItem;
+    vertexArrayIndex++;
+    glEnableVertexAttribArray(vertexArrayIndex);
+    glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
+        (void *)bufferStartOffset);
+    sizeOfLastItem = sizeof(Particle::_mass);
+
+    // radius of influence
+    itemType = GL_FLOAT;
+    numItems = sizeof(Particle::_radiusOfInfluence) / sizeof(float);
+    bufferStartOffset += sizeOfLastItem;
+    vertexArrayIndex++;
+    glEnableVertexAttribArray(vertexArrayIndex);
+    glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
+        (void *)bufferStartOffset);
+    sizeOfLastItem = sizeof(Particle::_radiusOfInfluence);
 
     // "is active" flag
     itemType = GL_INT;
     numItems = sizeof(Particle::_isActive) / sizeof(int);
-    bufferStartOffset += sizeof(Particle::_velocity);
+    bufferStartOffset += sizeOfLastItem;
     vertexArrayIndex++;
     glEnableVertexAttribArray(vertexArrayIndex);
     glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
         (void *)bufferStartOffset);
+    sizeOfLastItem = sizeof(Particle::_isActive);
 
     // cleanup
     glBindVertexArray(0);   // unbind this BEFORE the array

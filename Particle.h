@@ -22,8 +22,10 @@ struct Particle
     Creator: John Cox, 10-2-2016
     -------------------------------------------------------------------------------------------*/
     Particle() :
-        _position(),
-        _velocity(),
+        // glm structures already have "set to 0" constructors
+        _collisionCountThisFrame(0),
+        _mass(0.1f),
+        _radiusOfInfluence(0.01f),
         _isActive(0)
     {
     }
@@ -37,10 +39,23 @@ struct Particle
     // Note: Yes, I did take care of the byte offset in the vertex attrib pointer.
     glm::vec4 _position;
     glm::vec4 _velocity;
+    glm::vec4 _netForce;
+
+    // used to determine color 
+    // TODO: decide between this for color blending or net force
+    int _collisionCountThisFrame;
+
+    // all particles have identical mass for now
+    float _mass;
+
+    // used for collision detection because a particle's position is float values, so two
+    // particles' position are almost never going to be exactly equal
+    float _radiusOfInfluence;
 
     // Note: Booleans cannot be uploaded to the shader 
     // (https://www.opengl.org/sdk/docs/man/html/glVertexAttribPointer.xhtml), so send the 
     // "is active" flag as an integer.  
     int _isActive; 
-    float integerBuffer[3]; // pads out the integer to 16 bytes to match the GPU's version
+    
+    // any necessary padding out to 16 bytes to match the GPU's version
 };

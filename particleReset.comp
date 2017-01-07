@@ -43,20 +43,6 @@ struct MyVertex
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    This demo is in 2D, so each polygon face is described by two vertices.  In 3D, this 
-    structure will be updated to contain three.
-    
-    Must match the version on the CPU side.
-Creator: John Cox (9-25-2016)
------------------------------------------------------------------------------------------------*/
-struct PolygonFace
-{
-    MyVertex _start;
-    MyVertex _end;
-};
-
-/*-----------------------------------------------------------------------------------------------
-Description:
     This is the array of particles that the compute shader will be accessing.  It is set up on 
     the CPU side in ParticleSsbo::Init(...).
 

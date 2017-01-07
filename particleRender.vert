@@ -19,7 +19,7 @@ void main()
         // invisible (alpha = 0), but "fully transparent" does not mean "no color", it merely 
         // means that the color of this thing will be added to the thing behind it (see Z 
         // adjustment later)
-        particleColor = vec4(0.0f, 0.0f, 0.0f, 0.0f);
+        particleColor = vec4(1.0f, 0.0f, 0.0f, 0.0f);
         gl_Position = vec4(pos, -0.6f, 1.0f);
     }
     else

@@ -2,6 +2,7 @@
 
 #include "ShaderStorage.h"
 #include "glload/include/glload/gl_4_4.h"
+#include "glm/gtc/type_ptr.hpp"
 
 /*-----------------------------------------------------------------------------------------------
 Description:
@@ -18,22 +19,51 @@ Parameters:
 Returns:    None
 Creator:    John Cox (11-24-2016)
 -----------------------------------------------------------------------------------------------*/
-ComputeParticleUpdate::ComputeParticleUpdate(unsigned int numParticles, unsigned int numFaces, const std::string &computeShaderKey)
+ComputeParticleUpdate::ComputeParticleUpdate(const std::string &computeShaderKey) :
+    _totalParticleCount(0),
+    _activeParticleCount(0),
+    _computeProgramId(0),
+    _acParticleCounterBufferId(0),
+    _acParticleCounterCopyBufferId(0),
+    _unifLocParticleCount(-1),
+    _unifLocParticleRegionCenter(-1),
+    _unifLocParticleRegionRadiusSqr(-1),
+    _unifLocDeltaTimeSec(-1)
 {
-    _totalParticleCount = numParticles;
     ShaderStorage &shaderStorageRef = ShaderStorage::GetInstance();
 
     _unifLocParticleCount = shaderStorageRef.GetUniformLocation(computeShaderKey, "uMaxParticleCount");
-    _unifLocPolygonFaceCount = shaderStorageRef.GetUniformLocation(computeShaderKey, "uPolygonFaceCount");
+    _unifLocParticleRegionCenter = shaderStorageRef.GetUniformLocation(computeShaderKey, "uParticleRegionCenter");
+    _unifLocParticleRegionRadiusSqr = shaderStorageRef.GetUniformLocation(computeShaderKey, "uParticleRegionRadiusSqr");
     _unifLocDeltaTimeSec = shaderStorageRef.GetUniformLocation(computeShaderKey, "uDeltaTimeSec");
 
     _computeProgramId = shaderStorageRef.GetShaderProgram(computeShaderKey);
+}
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Cleans up buffers that were allocated in this object.
+Parameters: None
+Returns:    None
+Creator:    John Cox (10-10-2016)    (created prior to this class in an earlier design)
+-----------------------------------------------------------------------------------------------*/
+ComputeParticleUpdate::~ComputeParticleUpdate()
+{
+    glDeleteBuffers(1, &_acParticleCounterBufferId);
+    glDeleteBuffers(1, &_acParticleCounterCopyBufferId);
+}
+
+// TODO: header
+void ComputeParticleUpdate::Init(unsigned int numParticles, const glm::vec4 &particleRegionCenter, const float particleRegionRadius)
+{
+    _totalParticleCount = numParticles;
 
     glUseProgram(_computeProgramId);
 
     // the program in which this uniform is located must be bound in order to set the value
     glUniform1ui(_unifLocParticleCount, numParticles);
-    glUniform1ui(_unifLocPolygonFaceCount, numFaces);
+    glUniform4fv(_unifLocParticleRegionCenter, 1, glm::value_ptr(particleRegionCenter));
+    glUniform1f(_unifLocParticleRegionRadiusSqr, particleRegionRadius * particleRegionRadius);
     // delta time set in Update(...)
 
     // atomic counter initialization courtesy of geeks3D (and my use of glBufferData(...) 
@@ -69,19 +99,6 @@ ComputeParticleUpdate::ComputeParticleUpdate(unsigned int numParticles, unsigned
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    Cleans up buffers that were allocated in this object.
-Parameters: None
-Returns:    None
-Creator:    John Cox (10-10-2016)    (created prior to this class in an earlier design)
------------------------------------------------------------------------------------------------*/
-ComputeParticleUpdate::~ComputeParticleUpdate()
-{
-    glDeleteBuffers(1, &_acParticleCounterBufferId);
-    glDeleteBuffers(1, &_acParticleCounterCopyBufferId);
-}
-
-/*-----------------------------------------------------------------------------------------------
-Description:
     Examines all active particles and:
     (1) updates their position based on velocity and delta time
     (2) checks if they have gone outside the polygon bounds, and if so, deactives them
@@ -91,7 +108,7 @@ Returns:    None
 Creator:    John Cox (10-10-2016)
             (created in an earlier class, but later split into a dedicated class)
 -----------------------------------------------------------------------------------------------*/
-unsigned int ComputeParticleUpdate::Update(const float deltaTimeSec) const
+void ComputeParticleUpdate::Update(const float deltaTimeSec) 
 {
     // spread out the particles between lots of work items, but keep it 1-dimensional for easy 
     // navigation through a 1-dimensional particle buffer
@@ -120,13 +137,16 @@ unsigned int ComputeParticleUpdate::Update(const float deltaTimeSec) const
     glBindBuffer(GL_COPY_WRITE_BUFFER, _acParticleCounterCopyBufferId);
     glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, sizeof(GLuint));
     unsigned int *ptr = (GLuint*)glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, sizeof(GLuint), GL_MAP_READ_BIT);
-    unsigned int numActiveParticles = *ptr;
+    _activeParticleCount = *ptr;
     glUnmapBuffer(GL_COPY_WRITE_BUFFER);
 
     // cleanup
     glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
     glBindBuffer(GL_COPY_READ_BUFFER, 0);
+}
 
-    return numActiveParticles;
-
+// TODO: header
+unsigned int ComputeParticleUpdate::NumActiveParticles() const
+{
+    return _activeParticleCount;
 }

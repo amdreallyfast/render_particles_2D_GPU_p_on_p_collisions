@@ -65,22 +65,12 @@ GLint gUnifLocGeometryTransform;
 
 // ??stored in scene??
 ParticleSsbo gParticleBuffer;
-PolygonSsbo gPolygonFaceBuffer;
-ParticleRegionPolygon *gpPolygonRegion = 0;
-
-//// in a bigger program, this would somehow be encapsulated and associated with both the circle
-//// geometry and the circle particle region, and ditto for the polygon
-//glm::mat4 gRegionTransformMatrix;
+PolygonSsbo gQuadTree;
+PolygonSsbo gBoundingRegion;
 
 // in a bigger program, ??where would particle stuff be stored??
-IParticleEmitter *gpParticleEmitterPoint1 = 0;
-IParticleEmitter *gpParticleEmitterPoint2 = 0;
-IParticleEmitter *gpParticleEmitterPoint3 = 0;
-IParticleEmitter *gpParticleEmitterPoint4 = 0;
 IParticleEmitter *gpParticleEmitterBar1 = 0;
 IParticleEmitter *gpParticleEmitterBar2 = 0;
-IParticleEmitter *gpParticleEmitterBar3 = 0;
-IParticleEmitter *gpParticleEmitterBar4 = 0;
 ComputeParticleReset *gpParticleReseter = 0;
 ComputeParticleUpdate *gpParticleUpdater = 0;
 
@@ -215,15 +205,11 @@ void Init()
     shaderStorageRef.AddShaderFile(renderGeometryShaderKey, "geometry.vert", GL_VERTEX_SHADER);
     shaderStorageRef.AddShaderFile(renderGeometryShaderKey, "geometry.frag", GL_FRAGMENT_SHADER);
     shaderStorageRef.LinkShader(renderGeometryShaderKey);
-    gUnifLocGeometryTransform = shaderStorageRef.GetUniformLocation(renderGeometryShaderKey, "transformMatrixWindowSpace");
+    //gUnifLocGeometryTransform = shaderStorageRef.GetUniformLocation(renderGeometryShaderKey, "transformMatrixWindowSpace");
 
     // set up the polygon SSBO for computing and rendering
     std::vector<PolygonFace> polygonFaces;
     GeneratePolygonRegion(&polygonFaces);
-    gpPolygonRegion = new ParticleRegionPolygon(polygonFaces);
-    gPolygonFaceBuffer.Init();
-    gPolygonFaceBuffer.ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderUpdateKey));
-    gPolygonFaceBuffer.ConfigureRender(shaderStorageRef.GetShaderProgram(renderGeometryShaderKey));
 
     // set up the particle SSBO for computing and rendering
     std::vector<Particle> allParticles(MAX_PARTICLE_COUNT);
@@ -232,61 +218,78 @@ void Init()
     gParticleBuffer.ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderUpdateKey));
     gParticleBuffer.ConfigureRender(shaderStorageRef.GetShaderProgram(renderParticlesShaderKey));
 
-    // place the point emitters into the corners of the polygon region
-    // Note: Take into account that GeneratePolygonRegion(...) generates a polygon that covers 
-    // at least (-0.5f,-0.5f) to (+0.5f,+0.5f).
-    gpParticleEmitterPoint1 = new ParticleEmitterPoint(glm::vec2(-0.4f, -0.5f), 0.3f, 0.5f);
-    gpParticleEmitterPoint2 = new ParticleEmitterPoint(glm::vec2(+0.4f, -0.5f), 0.3f, 0.5f);
-    gpParticleEmitterPoint3 = new ParticleEmitterPoint(glm::vec2(+0.5f, +0.25f), 0.3f, 0.5f);
-    gpParticleEmitterPoint4 = new ParticleEmitterPoint(glm::vec2(-0.5f, +0.25f), 0.3f, 0.5f);
+    //glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 45.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+    //windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(-0.1f, -0.05f, 0.0f));
+    glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+    windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(0.0f, 0.0f, 0.0f));
 
-    // scatter the bar emitters on the left, right, top, and bottom of the bar emitter
-    // Note: I want to render the bar, but doing so would require placing it in the collection 
-    // of polygon faces, and those are checked for "out of bounds".  I don't want the emitter's 
-    // face to contribute to the "out of bounds" checks, so rather than hop through hoops to 
-    // draw it, I just won't draw it.  The particles coming off it should be enough to give away 
-    // its location.
+    glm::vec4 particleRegionCenter = windowSpaceTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
+    float particleRegionRadius = 0.8f;
 
-    // bottom center and emitting up
-    glm::vec2 barStart(-0.1f, -0.6f);
-    glm::vec2 barEnd(+0.1f, -0.6f);
-    glm::vec2 emitDir(0.0f, +1.0f);
-    gpParticleEmitterBar1 = new ParticleEmitterBar(barStart, barEnd, emitDir, 0.1f, 0.6f);
+    // put the bar emitters across from each and spraying particles toward each other and up so 
+    // that the particles collide near the middle with a slight upward velocity
 
-    // right middle and emitting left
-    barStart = glm::vec2(+0.6f, -0.1f);
-    barEnd = glm::vec2(+0.6f, +0.1f);
-    emitDir = glm::vec2(-1.0f, 0.0f);
-    gpParticleEmitterBar2 = new ParticleEmitterBar(barStart, barEnd, emitDir, 0.1f, 0.6f);
+    // bar on the left and emitting up and right
+    glm::vec2 bar1P1(-0.5f, +0.1f);
+    glm::vec2 bar1P2(-0.5f, -0.1f);
+    glm::vec2 emitDir1(+1.0f, +0.5f);
+    float minVel = 0.1f;
+    float maxVel = 0.5f;
+    gpParticleEmitterBar1 = new ParticleEmitterBar(bar1P1, bar1P2, emitDir1, minVel, maxVel);
+    gpParticleEmitterBar1->SetTransform(windowSpaceTransform);
 
-    // top center and emitting down
-    barStart = glm::vec2(+0.1f, +0.4f);
-    barEnd = glm::vec2(-0.1f, +0.4f);
-    emitDir = glm::vec2(0.0f, -1.0f);
-    gpParticleEmitterBar3 = new ParticleEmitterBar(barStart, barEnd, emitDir, 0.1f, 0.6f);
-
-    // left middle and emitting right
-    barStart = glm::vec2(-0.6f, +0.1f);
-    barEnd = glm::vec2(-0.6f, -0.1f);
-    emitDir = glm::vec2(+1.0f, 0.0f);
-    gpParticleEmitterBar4 = new ParticleEmitterBar(barStart, barEnd, emitDir, 0.1f, 0.6f);
+    // bar on the right and emitting up and left
+    glm::vec2 bar2P1 = glm::vec2(+0.5f, +0.1f);
+    glm::vec2 bar2P2 = glm::vec2(+0.5f, -0.1f);
+    glm::vec2 emitDir2 = glm::vec2(-1.0f, +0.5f);
+    gpParticleEmitterBar2 = new ParticleEmitterBar(bar2P1, bar2P2, emitDir2, minVel, maxVel);
+    gpParticleEmitterBar2->SetTransform(windowSpaceTransform);
 
     // start up the encapsulation of the CPU side of the computer shader
     gpParticleReseter = new ComputeParticleReset(MAX_PARTICLE_COUNT, computeShaderResetKey);
-    gpParticleReseter->AddEmitter(gpParticleEmitterPoint1);
-    gpParticleReseter->AddEmitter(gpParticleEmitterPoint2);
-    gpParticleReseter->AddEmitter(gpParticleEmitterPoint3);
-    gpParticleReseter->AddEmitter(gpParticleEmitterPoint4);
     gpParticleReseter->AddEmitter(gpParticleEmitterBar1);
-    gpParticleReseter->AddEmitter(gpParticleEmitterBar2);
-    gpParticleReseter->AddEmitter(gpParticleEmitterBar3);
-    gpParticleReseter->AddEmitter(gpParticleEmitterBar4);
+    //gpParticleReseter->AddEmitter(gpParticleEmitterBar2);
 
-    gpParticleUpdater = new ComputeParticleUpdate(MAX_PARTICLE_COUNT, polygonFaces.size(), computeShaderUpdateKey);
+    gpParticleUpdater = new ComputeParticleUpdate(computeShaderUpdateKey);
+    gpParticleUpdater->Init(MAX_PARTICLE_COUNT, particleRegionCenter, particleRegionRadius);
 
     // the timer will be used for framerate calculations
     gTimer.Init();
     gTimer.Start();
+}
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Updates particle positions, generates the quad tree for the particles' new positions, and 
+    commands a new draw.
+Parameters: None
+Returns:    None
+Exception:  Safe
+Creator:    John Cox (1-2-2017)
+-----------------------------------------------------------------------------------------------*/
+void UpdateAllTheThings()
+{
+    // just hard-code it for this demo
+    float deltaTimeSec = 0.01f;
+
+    // reset inactive particles and update active particles (the MAGIC happens here)
+    // Note: 20 particles per emitter per frame * 8 emitters * 60 frames per second stabilizes 
+    // (for this particle region and the emitters' min-max spawn velocities) at ~45,000 active 
+    // particles in one moment.
+    // Also Note: 50 easily maxes out the maximuum 100,000 total particles active at one time.
+    gpParticleReseter->ResetParticles(20);
+    gpParticleUpdater->Update(deltaTimeSec);
+
+    // tell glut to call this display() function again on the next iteration of the main loop
+    // Note: https://www.opengl.org/discussion_boards/showthread.php/168717-I-dont-understand-what-glutPostRedisplay()-does
+    // Also Note: This display() function will also be registered to run if the window is moved
+    // or if the viewport is resized.  If glutPostRedisplay() is not called, then as long as the
+    // window stays put and doesn't resize, display() won't be called again (tested with 
+    // debugging).
+    // Also Also Note: It doesn't matter where this is called in this function.  It sets a flag
+    // for glut's main loop and doesn't actually call the registered display function, but I 
+    // got into the habbit of calling it at the end.
+    glutPostRedisplay();
 }
 
 /*-----------------------------------------------------------------------------------------------
@@ -306,40 +309,11 @@ void Display()
     glClearDepth(1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    // update all particle locations
-
-    // it's a big polygon for window space (see GeneratePolygonRegion(...)), so after rotating 
-    // it, don't move it very far or it will go out of window space and we won't see it
-    glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 45.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-    windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(-0.1f, -0.05f, 0.0f));
-
-    // pre-compute vertices so that they don't have to be transformed in exactly the same way 
-    // for every single particle
-    gpPolygonRegion->SetTransform(windowSpaceTransform);
-    gPolygonFaceBuffer.UpdateValues(gpPolygonRegion->GetFaces());
-    gpParticleEmitterPoint1->SetTransform(windowSpaceTransform);
-    gpParticleEmitterPoint2->SetTransform(windowSpaceTransform);
-    gpParticleEmitterPoint3->SetTransform(windowSpaceTransform);
-    gpParticleEmitterPoint4->SetTransform(windowSpaceTransform);
-    gpParticleEmitterBar1->SetTransform(windowSpaceTransform);
-    gpParticleEmitterBar2->SetTransform(windowSpaceTransform);
-    gpParticleEmitterBar3->SetTransform(windowSpaceTransform);
-    gpParticleEmitterBar4->SetTransform(windowSpaceTransform);
-
-
-    // reset inactive particles and update active particles (the MAGIC happens here)
-    // Note: 20 particles per emitter per frame * 8 emitters * 60 frames per second stabilizes 
-    // (for this particle region and the emitters' min-max spawn velocities) at ~45,000 active 
-    // particles in one moment.
-    // Also Note: 50 easily maxes out the maximuum 100,000 total particles active at one time.
-    gpParticleReseter->ResetParticles(20);
-    unsigned int numActiveParticles = gpParticleUpdater->Update(0.01f);
-    
-    // draw the particle region borders
-    glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("render geometry"));
-    glUniformMatrix4fv(gUnifLocGeometryTransform, 1, GL_FALSE, glm::value_ptr(windowSpaceTransform));
-    glBindVertexArray(gPolygonFaceBuffer.VaoId());
-    glDrawArrays(GL_LINES, 0, gPolygonFaceBuffer.NumVertices());
+    //// draw the particle region borders
+    //glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("render geometry"));
+    //glUniformMatrix4fv(gUnifLocGeometryTransform, 1, GL_FALSE, glm::value_ptr(windowSpaceTransform));
+    //glBindVertexArray(gPolygonFaceBuffer.VaoId());
+    //glDrawArrays(GL_LINES, 0, gPolygonFaceBuffer.NumVertices());
 
     // draw the particles
     glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("render particles"));
@@ -373,7 +347,7 @@ void Display()
 
     // now show number of active particles
     // Note: For some reason, lower case "i" seems to appear too close to the other letters.
-    sprintf(str, "active: %d", numActiveParticles);
+    sprintf(str, "active: %d", gpParticleUpdater->NumActiveParticles());
     float numActiveParticlesXY[2] = { -0.99f, +0.7f };
     gTextAtlases.GetAtlas(48)->RenderText(str, numActiveParticlesXY, scaleXY, color);
 
@@ -486,15 +460,9 @@ Creator:    John Cox (2-13-2016)
 -----------------------------------------------------------------------------------------------*/
 void CleanupAll()
 {
-    //// these deletion functions need the buffer ID, but they take a (void *) for the second 
-    delete gpParticleEmitterPoint1;
-    delete gpParticleEmitterPoint2;
-    delete gpParticleEmitterPoint3;
-    delete gpParticleEmitterPoint4;
+    // these deletion functions need the buffer ID, but they take a (void *) for the second 
     delete gpParticleEmitterBar1;
     delete gpParticleEmitterBar2;
-    delete gpParticleEmitterBar3;
-    delete gpParticleEmitterBar4;
     delete gpParticleReseter;
     delete gpParticleUpdater;
 }
@@ -523,7 +491,7 @@ int main(int argc, char *argv[])
     glutInitContextProfile(GLUT_CORE_PROFILE);
 
     // enable this for automatic message reporting (see OpenGlErrorHandling.cpp)
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
     glutInitContextFlags(GLUT_DEBUG);
 #endif
@@ -553,6 +521,7 @@ int main(int argc, char *argv[])
 
     Init();
 
+    glutIdleFunc(UpdateAllTheThings);
     glutDisplayFunc(Display);
     glutReshapeFunc(Reshape);
     glutKeyboardFunc(Keyboard);

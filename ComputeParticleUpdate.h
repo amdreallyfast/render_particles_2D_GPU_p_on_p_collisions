@@ -1,33 +1,38 @@
 #pragma once
 
-#include "IParticleEmitter.h"
-#include "ParticleEmitterPoint.h"
-#include "ParticleEmitterBar.h"
 #include <string>
-#include <vector>
+#include "glm/vec4.hpp"
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    Encapsulates particle updating via compute shader.  Particle updating includes particle 
-    movement and checking if it is out of the polygon boundaries.  There is one compute shader 
-    that does this, and this class is built to communicate with and summon that particular 
-    shader.
+    Encapsulates the following particle updates via compute shader:
+    (1) Updates particle positions based on the net force that was applied to them in the
+    previous frame.
+    (2) If any particles have gone out of bounds, flag them as inactive.
+    (3) Emit as many particles for this frame as each emitter allows.
+
+    There is one compute shader that does this, and this class is built to communicate with and 
+    summon that particular shader.
 
     Note: This class is not concerned with the particle SSBO.  It is concerned with uniforms and
     summoning the shader.  SSBO setup is performed in the appropriate SSBO object.
-
 Creator:    John Cox (11-24-2016)
 -----------------------------------------------------------------------------------------------*/
 class ComputeParticleUpdate
 {
 public:
-    ComputeParticleUpdate(unsigned int numParticles, unsigned int numFaces, const std::string &computeShaderKey);
+    //ComputeParticleUpdate(unsigned int numParticles, unsigned int numFaces, const std::string &computeShaderKey);
+    ComputeParticleUpdate(const std::string &computeShaderKey);
     ~ComputeParticleUpdate();
 
-    unsigned int Update(const float deltaTimeSec) const;
+    void Init(unsigned int numParticles, const glm::vec4 &particleRegionCenter, const float particleRegionRadius);
+
+    void Update(const float deltaTimeSec);
+    unsigned int NumActiveParticles() const;
 
 private:
     unsigned int _totalParticleCount;
+    unsigned int _activeParticleCount;
     unsigned int _computeProgramId;
 
     // the atomic counter is used to count the total number of active particles after this 
@@ -41,8 +46,9 @@ private:
     unsigned int _acParticleCounterBufferId;
     unsigned int _acParticleCounterCopyBufferId;
 
-    // unlike most OpeGL IDs, uniform locations are GLint
+    // unlike most OpenGL IDs, uniform locations are GLint
     int _unifLocParticleCount;
-    int _unifLocPolygonFaceCount;
+    int _unifLocParticleRegionCenter;
+    int _unifLocParticleRegionRadiusSqr;
     int _unifLocDeltaTimeSec;
 };

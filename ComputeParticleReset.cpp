@@ -150,7 +150,7 @@ Creator:    John Cox (10-10-2016)
 -----------------------------------------------------------------------------------------------*/
 void ComputeParticleReset::ResetParticles(unsigned int particlesPerEmitterPerFrame)
 {
-    if (_pointEmitters.empty() || _barEmitters.empty())
+    if (_pointEmitters.empty() && _barEmitters.empty())
     {
         // nothing to do
         return;
@@ -225,7 +225,7 @@ void ComputeParticleReset::ResetParticles(unsigned int particlesPerEmitterPerFra
         glm::vec4 emitDir = emitter->GetEmitDir();
         float emitterBarP1Arr[4] = { emitterBarP1.x, emitterBarP1.y, emitterBarP1.z, emitterBarP1.w };
         float emitterBarP2Arr[4] = { emitterBarP2.x, emitterBarP2.y, emitterBarP2.z, emitterBarP2.w };
-        float emitterBarEmitDir[4] = { emitDir.x, emitDir.y, emitDir.y, emitDir.z };
+        float emitterBarEmitDir[4] = { emitDir.x, emitDir.y, emitDir.z, emitDir.w };
         glUniform4fv(_unifLocBarEmitterP1, 1, emitterBarP1Arr);
         glUniform4fv(_unifLocBarEmitterP2, 1, emitterBarP2Arr);
         glUniform4fv(_unifLocBarEmitterEmitDir, 1, emitterBarEmitDir);
