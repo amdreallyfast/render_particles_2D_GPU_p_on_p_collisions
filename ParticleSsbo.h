@@ -15,11 +15,11 @@ Creator:    John Cox (9-3-2016)
 class ParticleSsbo : public SsboBase
 {
 public:
-    ParticleSsbo();
+    ParticleSsbo(const std::vector<Particle> &allParticles);
     virtual ~ParticleSsbo();
     
-    void Init(const std::vector<Particle> &allParticles);
+    //void Init(const std::vector<Particle> &allParticles);
     void ConfigureCompute(unsigned int computeProgramId) override;
-    void ConfigureRender(unsigned int renderProgramId) override;
+    void ConfigureRender(unsigned int renderProgramId, unsigned int drawStyle) override;
 };
 

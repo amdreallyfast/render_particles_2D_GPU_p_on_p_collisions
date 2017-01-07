@@ -13,14 +13,14 @@ Creator: John Cox, 9-8-2016
 class PolygonSsbo : public SsboBase
 {
 public:
-    PolygonSsbo();
+    PolygonSsbo(const std::vector<PolygonFace> &faceCollection);
     virtual ~PolygonSsbo();
 
-    void Init();
+    //void Init();
     void ConfigureCompute(unsigned int computeProgramId) override;
-    void ConfigureRender(unsigned int renderProgramId) override;
+    void ConfigureRender(unsigned int renderProgramId, unsigned int drawStyle) override;
 
-    void UpdateValues(const std::vector<PolygonFace> &faceCollection);
+    //void UpdateValues(const std::vector<PolygonFace> &faceCollection);
 
 private:
     unsigned int _bufferSizeBytes;

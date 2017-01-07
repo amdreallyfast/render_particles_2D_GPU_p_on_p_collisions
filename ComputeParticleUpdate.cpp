@@ -6,20 +6,22 @@
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    Generates atomic counters for use in the "particle update" compute shader.
-    Looks up all uniforms in the compute shader.
+    Looks up all uniforms in the "particle update" compute shader.
 
     Note: This constructor takes a string key for the compute shader instead of a program ID 
     because the shader storage object, which is responsible for finding uniforms, takes a shader 
     key instead of a direct program ID.
 Parameters: 
     numParticles        Used to tell a shader uniform how big the "all particles" buffer is.
-    numFaces            Used to tell a shader uniform how many polygon faces are in play.
+    particleRegionCenter    The region of validity is a circle.  This is the center.
+    particleRegionRadius    Self-explanatory in light of the center.
     computeShaderKey    Used to look up (1) the compute shader ID and (2) uniform locations.
 Returns:    None
 Creator:    John Cox (11-24-2016)
 -----------------------------------------------------------------------------------------------*/
-ComputeParticleUpdate::ComputeParticleUpdate(const std::string &computeShaderKey) :
+ComputeParticleUpdate::ComputeParticleUpdate(unsigned int numParticles, 
+    const glm::vec4 &particleRegionCenter, const float particleRegionRadius, 
+    const std::string &computeShaderKey) :
     _totalParticleCount(0),
     _activeParticleCount(0),
     _computeProgramId(0),
@@ -30,6 +32,8 @@ ComputeParticleUpdate::ComputeParticleUpdate(const std::string &computeShaderKey
     _unifLocParticleRegionRadiusSqr(-1),
     _unifLocDeltaTimeSec(-1)
 {
+    _totalParticleCount = numParticles;
+
     ShaderStorage &shaderStorageRef = ShaderStorage::GetInstance();
 
     _unifLocParticleCount = shaderStorageRef.GetUniformLocation(computeShaderKey, "uMaxParticleCount");
@@ -38,29 +42,9 @@ ComputeParticleUpdate::ComputeParticleUpdate(const std::string &computeShaderKey
     _unifLocDeltaTimeSec = shaderStorageRef.GetUniformLocation(computeShaderKey, "uDeltaTimeSec");
 
     _computeProgramId = shaderStorageRef.GetShaderProgram(computeShaderKey);
-}
 
-/*-----------------------------------------------------------------------------------------------
-Description:
-    Cleans up buffers that were allocated in this object.
-Parameters: None
-Returns:    None
-Creator:    John Cox (10-10-2016)    (created prior to this class in an earlier design)
------------------------------------------------------------------------------------------------*/
-ComputeParticleUpdate::~ComputeParticleUpdate()
-{
-    glDeleteBuffers(1, &_acParticleCounterBufferId);
-    glDeleteBuffers(1, &_acParticleCounterCopyBufferId);
-}
-
-// TODO: header
-void ComputeParticleUpdate::Init(unsigned int numParticles, const glm::vec4 &particleRegionCenter, const float particleRegionRadius)
-{
-    _totalParticleCount = numParticles;
-
+    // set uniform values and generate this compute shader's atomic counters
     glUseProgram(_computeProgramId);
-
-    // the program in which this uniform is located must be bound in order to set the value
     glUniform1ui(_unifLocParticleCount, numParticles);
     glUniform4fv(_unifLocParticleRegionCenter, 1, glm::value_ptr(particleRegionCenter));
     glUniform1f(_unifLocParticleRegionRadiusSqr, particleRegionRadius * particleRegionRadius);
@@ -95,6 +79,19 @@ void ComputeParticleUpdate::Init(unsigned int numParticles, const glm::vec4 &par
     // memory pointer.  Doing this with the actual atomic counter caused a horrific performance 
     // drop.  It appeared to completely trash the instruction pipeline.
     glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, _acParticleCounterBufferId);
+}
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Cleans up buffers that were allocated in this object.
+Parameters: None
+Returns:    None
+Creator:    John Cox (10-10-2016)    (created prior to this class in an earlier design)
+-----------------------------------------------------------------------------------------------*/
+ComputeParticleUpdate::~ComputeParticleUpdate()
+{
+    glDeleteBuffers(1, &_acParticleCounterBufferId);
+    glDeleteBuffers(1, &_acParticleCounterCopyBufferId);
 }
 
 /*-----------------------------------------------------------------------------------------------
@@ -145,7 +142,14 @@ void ComputeParticleUpdate::Update(const float deltaTimeSec)
     glBindBuffer(GL_COPY_READ_BUFFER, 0);
 }
 
-// TODO: header
+/*-----------------------------------------------------------------------------------------------
+Description:
+    A simple getter for the number of particles that were active on the last Update(...) call.
+    Useful for performance comparison with CPU version.
+Parameters: None
+Returns:    None
+Creator:    John Cox (1-7-2017)
+-----------------------------------------------------------------------------------------------*/
 unsigned int ComputeParticleUpdate::NumActiveParticles() const
 {
     return _activeParticleCount;

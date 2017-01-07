@@ -21,11 +21,9 @@ Creator:    John Cox (11-24-2016)
 class ComputeParticleUpdate
 {
 public:
-    //ComputeParticleUpdate(unsigned int numParticles, unsigned int numFaces, const std::string &computeShaderKey);
-    ComputeParticleUpdate(const std::string &computeShaderKey);
+    ComputeParticleUpdate(unsigned int numParticles, const glm::vec4 &particleRegionCenter, 
+        const float particleRegionRadius, const std::string &computeShaderKey);
     ~ComputeParticleUpdate();
-
-    void Init(unsigned int numParticles, const glm::vec4 &particleRegionCenter, const float particleRegionRadius);
 
     void Update(const float deltaTimeSec);
     unsigned int NumActiveParticles() const;

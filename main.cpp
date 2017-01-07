@@ -44,7 +44,6 @@
 #include "glm/vec2.hpp"
 #include "ParticleSsbo.h"
 #include "PolygonSsbo.h"
-#include "ParticlePolygonRegion.h"
 #include "ComputeParticleReset.h"
 #include "ComputeParticleUpdate.h"
 
@@ -64,9 +63,9 @@ FreeTypeEncapsulated gTextAtlases;
 GLint gUnifLocGeometryTransform;
 
 // ??stored in scene??
-ParticleSsbo gParticleBuffer;
-PolygonSsbo gQuadTree;
-PolygonSsbo gBoundingRegion;
+ParticleSsbo *gpParticleBuffer;
+PolygonSsbo *gpParticleBoundingRegion;
+PolygonSsbo *gpQuadTree;
 
 // in a bigger program, ??where would particle stuff be stored??
 IParticleEmitter *gpParticleEmitterBar1 = 0;
@@ -98,38 +97,102 @@ static glm::vec2 RotateNeg90(const glm::vec2 &v)
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    Manually (it's a demo, so eh?) generates a polygon centered around the window space origin 
-    (0,0) with corners at:
-    - vec2(-0.25f, -0.5f);
-    - vec2(+0.25f, -0.5f);
-    - vec2(+0.5f, +0.25f);
-    - vec2(-0.5f, +0.25f);
+    Creates a 32-point wireframe circle.
+
+    Note: I could have used sinf(...) and cosf(...) to create the points, but where's the fun in
+    that if I have a faster and obtuse algorithm :) ?  Algorithm courtesy of 
+    http://slabode.exofire.net/circle_draw.shtml .
 Parameters:
-    polygonFaceCollection   A pointer to the structure that needs to be filled out.
+    putDataHere     Self-explanatory.
+    radius          Values in window coordinates (X and Y on range [-1,+1]).
 Returns:    None
-Creator:    John Cox (9-25-2016)
+Exception:  Safe
+Creator:    John Cox (6-12-2016)
+            Adapted for this program 1/7/2017
 -----------------------------------------------------------------------------------------------*/
-static void GeneratePolygonRegion(std::vector<PolygonFace> *polygonFaceCollection)
+void GenerateCircle(const glm::vec4 &center, const float radius, std::vector<PolygonFace> *putDataHere)
 {
-    glm::vec2 p1(-0.5f, -0.75f);
-    glm::vec2 p2(+0.5f, -0.75f);
-    glm::vec2 p3(+0.75f, +0.5f);
-    glm::vec2 p4(-0.75f, +0.5f);
-    glm::vec2 n1(glm::normalize(RotateNeg90(p2 - p1)));
-    glm::vec2 n2(glm::normalize(RotateNeg90(p3 - p2)));
-    glm::vec2 n3(glm::normalize(RotateNeg90(p4 - p3)));
-    glm::vec2 n4(glm::normalize(RotateNeg90(p1 - p4)));
-    PolygonFace face1(MyVertex(p1, n1), MyVertex(p2, n1));
-    PolygonFace face2(MyVertex(p2, n2), MyVertex(p3, n2));
-    PolygonFace face3(MyVertex(p3, n3), MyVertex(p4, n3));
-    PolygonFace face4(MyVertex(p4, n4), MyVertex(p1, n4));
+    // a 32-point, 0.25 radius (window dimensions) circle will suffice for this demo
+    unsigned int arcSegments = 32;
+    float x = radius;
+    float y = 0.0f;
+    float theta = 2 * 3.1415926f / float(arcSegments);
+    float tangetialFactor = tanf(theta);
+    float radialFactor = cosf(theta);
 
-    polygonFaceCollection->push_back(face1);
-    polygonFaceCollection->push_back(face2);
-    polygonFaceCollection->push_back(face3);
-    polygonFaceCollection->push_back(face4);
+    // duplicate vertices are expected in this approach
+    // Note: The polygon SSBOs were made in anticipation of particle-polygon collision detection 
+    // in a compute shader, in which each face should be a self-contained unit.  I decided that 
+    // duplicate vertices would be ok for this project since it is particle-heavy, not vertex 
+    // heavy.  Besides, graphical memory is absurdly cheap these days.
+    // Also Note: This algorithm assumes (I think) that the origin is at (0,0).  Account for 
+    // non-0 centers by adding the argument "center" to each vertex after it is calculated.
+    for (unsigned int segmentCount = 0; segmentCount < 32; segmentCount++)
+    {
+        glm::vec2 pos1(x, y);
+        glm::vec2 normal1(glm::normalize(glm::vec2(x, y)));
+        MyVertex v1(pos1, normal1);
+
+        float tx = (-y) * tangetialFactor;
+        float ty = x * tangetialFactor;
+
+        // add the tangential factor
+        x += tx;
+        y += ty;
+
+        // correct using the radial factor
+        x *= radialFactor;
+        y *= radialFactor;
+
+        glm::vec2 pos2(x, y);
+        glm::vec2 normal2(glm::normalize(glm::vec2(x, y)));
+        MyVertex v2(pos2, normal2);
+
+        // Note: The same X and Y that were used for the second vertex will be used for the 
+        // first vertex of the next face.
+
+        // account for non-0 circle centers
+        v1._position += center;
+        v2._position += center;
+
+        putDataHere->push_back(PolygonFace(v1, v2));
+    }
 }
-
+//
+///*-----------------------------------------------------------------------------------------------
+//Description:
+//    Manually (it's a demo, so eh?) generates a polygon centered around the window space origin 
+//    (0,0) with corners at:
+//    - vec2(-0.25f, -0.5f);
+//    - vec2(+0.25f, -0.5f);
+//    - vec2(+0.5f, +0.25f);
+//    - vec2(-0.5f, +0.25f);
+//Parameters:
+//    polygonFaceCollection   A pointer to the structure that needs to be filled out.
+//Returns:    None
+//Creator:    John Cox (9-25-2016)
+//-----------------------------------------------------------------------------------------------*/
+//static void GeneratePolygonRegion(std::vector<PolygonFace> *polygonFaceCollection)
+//{
+//    glm::vec2 p1(-0.5f, -0.75f);
+//    glm::vec2 p2(+0.5f, -0.75f);
+//    glm::vec2 p3(+0.75f, +0.5f);
+//    glm::vec2 p4(-0.75f, +0.5f);
+//    glm::vec2 n1(glm::normalize(RotateNeg90(p2 - p1)));
+//    glm::vec2 n2(glm::normalize(RotateNeg90(p3 - p2)));
+//    glm::vec2 n3(glm::normalize(RotateNeg90(p4 - p3)));
+//    glm::vec2 n4(glm::normalize(RotateNeg90(p1 - p4)));
+//    PolygonFace face1(MyVertex(p1, n1), MyVertex(p2, n1));
+//    PolygonFace face2(MyVertex(p2, n2), MyVertex(p3, n2));
+//    PolygonFace face3(MyVertex(p3, n3), MyVertex(p4, n3));
+//    PolygonFace face4(MyVertex(p4, n4), MyVertex(p1, n4));
+//
+//    polygonFaceCollection->push_back(face1);
+//    polygonFaceCollection->push_back(face2);
+//    polygonFaceCollection->push_back(face3);
+//    polygonFaceCollection->push_back(face4);
+//}
+//
 
 /*-----------------------------------------------------------------------------------------------
 Description:
@@ -205,19 +268,10 @@ void Init()
     shaderStorageRef.AddShaderFile(renderGeometryShaderKey, "geometry.vert", GL_VERTEX_SHADER);
     shaderStorageRef.AddShaderFile(renderGeometryShaderKey, "geometry.frag", GL_FRAGMENT_SHADER);
     shaderStorageRef.LinkShader(renderGeometryShaderKey);
+    GLuint renderGeometryProgramId = shaderStorageRef.GetShaderProgram(renderGeometryShaderKey);
     //gUnifLocGeometryTransform = shaderStorageRef.GetUniformLocation(renderGeometryShaderKey, "transformMatrixWindowSpace");
 
-    // set up the polygon SSBO for computing and rendering
-    std::vector<PolygonFace> polygonFaces;
-    GeneratePolygonRegion(&polygonFaces);
-
-    // set up the particle SSBO for computing and rendering
-    std::vector<Particle> allParticles(MAX_PARTICLE_COUNT);
-    gParticleBuffer.Init(allParticles);
-    gParticleBuffer.ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderResetKey));
-    gParticleBuffer.ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderUpdateKey));
-    gParticleBuffer.ConfigureRender(shaderStorageRef.GetShaderProgram(renderParticlesShaderKey));
-
+    // set up the particle region 
     glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 45.0f, glm::vec3(0.0f, 0.0f, 1.0f));
     windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(-0.1f, -0.05f, 0.0f));
     //glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
@@ -225,6 +279,18 @@ void Init()
 
     glm::vec4 particleRegionCenter = windowSpaceTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
     float particleRegionRadius = 0.8f;
+
+    std::vector<PolygonFace> polygonFaces;
+    GenerateCircle(particleRegionCenter, particleRegionRadius, &polygonFaces);
+    gpParticleBoundingRegion = new PolygonSsbo(polygonFaces);
+    gpParticleBoundingRegion->ConfigureRender(renderGeometryProgramId, GL_LINES);
+
+    // set up the particle SSBO for computing and rendering
+    std::vector<Particle> allParticles(MAX_PARTICLE_COUNT);
+    gpParticleBuffer = new ParticleSsbo(allParticles);
+    gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderResetKey));
+    gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderUpdateKey));
+    gpParticleBuffer->ConfigureRender(shaderStorageRef.GetShaderProgram(renderParticlesShaderKey), GL_POINTS);
 
     // put the bar emitters across from each and spraying particles toward each other and up so 
     // that the particles collide near the middle with a slight upward velocity
@@ -250,8 +316,8 @@ void Init()
     gpParticleReseter->AddEmitter(gpParticleEmitterBar1);
     gpParticleReseter->AddEmitter(gpParticleEmitterBar2);
 
-    gpParticleUpdater = new ComputeParticleUpdate(computeShaderUpdateKey);
-    gpParticleUpdater->Init(MAX_PARTICLE_COUNT, particleRegionCenter, particleRegionRadius);
+    gpParticleUpdater = new ComputeParticleUpdate(MAX_PARTICLE_COUNT, particleRegionCenter, particleRegionRadius, computeShaderUpdateKey);
+    //gpParticleUpdater->Init(MAX_PARTICLE_COUNT, particleRegionCenter, particleRegionRadius);
 
     // the timer will be used for framerate calculations
     gTimer.Init();
@@ -309,16 +375,16 @@ void Display()
     glClearDepth(1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    //// draw the particle region borders
-    //glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("render geometry"));
+    // draw the particle region borders
+    glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("render geometry"));
     //glUniformMatrix4fv(gUnifLocGeometryTransform, 1, GL_FALSE, glm::value_ptr(windowSpaceTransform));
-    //glBindVertexArray(gPolygonFaceBuffer.VaoId());
-    //glDrawArrays(GL_LINES, 0, gPolygonFaceBuffer.NumVertices());
+    glBindVertexArray(gpParticleBoundingRegion->VaoId());
+    glDrawArrays(GL_LINES, 0, gpParticleBoundingRegion->NumVertices());
 
     // draw the particles
     glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("render particles"));
-    glBindVertexArray(gParticleBuffer.VaoId());
-    glDrawArrays(gParticleBuffer.DrawStyle(), 0, gParticleBuffer.NumVertices());
+    glBindVertexArray(gpParticleBuffer->VaoId());
+    glDrawArrays(gpParticleBuffer->DrawStyle(), 0, gpParticleBuffer->NumVertices());
 
     // draw the frame rate once per second in the lower left corner
     GLfloat color[4] = { 0.5f, 0.5f, 0.0f, 1.0f };

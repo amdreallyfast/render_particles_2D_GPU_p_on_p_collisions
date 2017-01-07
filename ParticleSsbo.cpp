@@ -7,14 +7,32 @@
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    Ensures that the object starts object with initialized values.
+    Ensures that the object starts object with initialized values and that the buffer's size is 
+    established.
+
+    Buffer values are initialized in separate compute and render shader initialization routines 
+    because :
+    (1) The buffer's size and contents (glBufferData(...)) should be established only once.  It
+    is ok for it to be initialized the exact same way twice, but I consider that wasteful.
+    (2) There is more than one shader that will use the same buffer, so the buffer needs to be
+    available when initializing either shader with it.
+
+    So it makes sense to generate the buffer and set its size and contents in one place, and
+    then to configure each shader separately.
 Parameters: None
 Returns:    None
 Creator: John Cox, 9-6-2016
 -----------------------------------------------------------------------------------------------*/
-ParticleSsbo::ParticleSsbo() :
-    SsboBase()
+ParticleSsbo::ParticleSsbo(const std::vector<Particle> &allParticles) :
+    SsboBase()  // generate buffers
 {
+    _numVertices = allParticles.size();
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, _bufferId);
+    glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Particle) * allParticles.size(),
+        allParticles.data(), GL_STATIC_DRAW);
+
+    // cleanup
+    glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
 }
 
 /*-----------------------------------------------------------------------------------------------
@@ -28,49 +46,49 @@ Creator: John Cox, 9-6-2016
 ParticleSsbo::~ParticleSsbo()
 {
 }
-
-/*-----------------------------------------------------------------------------------------------
-Description:
-    The buffer is initialized in a separate Init(...) call from the compute and render shader 
-    initialization because of the following restrictions:
-    (1) OpenGL buffers cannot be generated until the OpenGL context is established, which means 
-    that the buffers cannot be generated in the constructor if this class is declared global or
-    static anywhere.
-    (2) The buffer's size and contents (glBufferData(...)) should be established only once.  It 
-    is ok for it to be initialized the exact same way twice, but I consider that wasteful.
-    (3) There is more than one shader that will use the same buffer, so the buffer needs to be 
-    available when initializing either shader with it.
-    
-    So it makes sense to generate the buffer and set its size and contents in one place, and 
-    then to configure each shader separately.
-Parameters: 
-    allParticles    The size of this collection determines the size of the SSBO that is 
-                    allocated on the GPU, and the values in the collection are dumped into the 
-                    GPU buffer.
-Returns:    None
-Creator: John Cox, 11-24-2016
------------------------------------------------------------------------------------------------*/
-void ParticleSsbo::Init(const std::vector<Particle> &allParticles)
-{
-    if (_bufferId == 0)
-    {
-        glGenBuffers(1, &_bufferId);
-
-        // only let the buffer size be set once
-        _numVertices = allParticles.size();
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, _bufferId);
-        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Particle) * allParticles.size(),
-            allParticles.data(), GL_STATIC_DRAW);
-        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
-    }
-
-    if (_vaoId == 0)
-    {
-        glGenVertexArrays(1, &_vaoId);
-    }
-
-    _hasBeenInitialized = true;
-}
+//
+///*-----------------------------------------------------------------------------------------------
+//Description:
+//    The buffer is initialized in a separate Init(...) call from the compute and render shader 
+//    initialization because of the following restrictions:
+//    (1) OpenGL buffers cannot be generated until the OpenGL context is established, which means 
+//    that the buffers cannot be generated in the constructor if this class is declared global or
+//    static anywhere.
+//    (2) The buffer's size and contents (glBufferData(...)) should be established only once.  It 
+//    is ok for it to be initialized the exact same way twice, but I consider that wasteful.
+//    (3) There is more than one shader that will use the same buffer, so the buffer needs to be 
+//    available when initializing either shader with it.
+//    
+//    So it makes sense to generate the buffer and set its size and contents in one place, and 
+//    then to configure each shader separately.
+//Parameters: 
+//    allParticles    The size of this collection determines the size of the SSBO that is 
+//                    allocated on the GPU, and the values in the collection are dumped into the 
+//                    GPU buffer.
+//Returns:    None
+//Creator: John Cox, 11-24-2016
+//-----------------------------------------------------------------------------------------------*/
+//void ParticleSsbo::Init(const std::vector<Particle> &allParticles)
+//{
+//    if (_bufferId == 0)
+//    {
+//        glGenBuffers(1, &_bufferId);
+//
+//        // only let the buffer size be set once
+//        _numVertices = allParticles.size();
+//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, _bufferId);
+//        glBufferData(GL_SHADER_STORAGE_BUFFER, sizeof(Particle) * allParticles.size(),
+//            allParticles.data(), GL_STATIC_DRAW);
+//        glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
+//    }
+//
+//    if (_vaoId == 0)
+//    {
+//        glGenVertexArrays(1, &_vaoId);
+//    }
+//
+//    _hasBeenInitialized = true;
+//}
 
 /*-----------------------------------------------------------------------------------------------
 Description:
@@ -82,11 +100,11 @@ Creator: John Cox, 11-24-2016
 -----------------------------------------------------------------------------------------------*/
 void ParticleSsbo::ConfigureCompute(unsigned int computeProgramId)
 {
-    if (!_hasBeenInitialized)
-    {
-        fprintf(stderr, "ParticleSsbo::ConfigureCompute(...) error: SSBO has not been initialized\n");
-        return;
-    }
+    //if (!_hasBeenInitialized)
+    //{
+    //    fprintf(stderr, "ParticleSsbo::ConfigureCompute(...) error: SSBO has not been initialized\n");
+    //    return;
+    //}
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, _bufferId);
 
@@ -123,16 +141,19 @@ Description:
     Sets up the vertex attribute pointers for this SSBO's VAO.
 Parameters: 
     RenderProgramId     Self-explanatory
+    drawStyle           Expected to be GL_POINTS.
 Returns:    None
 Creator: John Cox, 11-24-2016
 -----------------------------------------------------------------------------------------------*/
-void ParticleSsbo::ConfigureRender(unsigned int renderProgramId)
+void ParticleSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int drawStyle)
 {
-    if (!_hasBeenInitialized)
-    {
-        fprintf(stderr, "ParticleSsbo::ConfigureRender(...) error: SSBO has not been initialized\n");
-        return;
-    }
+    //if (!_hasBeenInitialized)
+    //{
+    //    fprintf(stderr, "ParticleSsbo::ConfigureRender(...) error: SSBO has not been initialized\n");
+    //    return;
+    //}
+
+    _drawStyle = drawStyle;
 
     // set up the VAO
     // now set up the vertex array indices for the drawing shader

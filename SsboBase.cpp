@@ -6,20 +6,27 @@
 Description:
     Gives members default values.
 
-    Do NOT attempt to generate the buffer and VAO here.  The OpenGL context must be started up 
-    prior to calling OpenGL functions.  Prior to OpenGL context instantiation, any gl*(...) 
-    function calls will throw an exception.
+    Note: As part of the Resource Acquisition is Initialization (RAII) approach that I am trying 
+    to use in this program, the SSBOs are generated here.  This means that the OpenGL context 
+    MUST be started up prior to initialization.  Prior to OpenGL context instantiation, any 
+    gl*(...) function calls will throw an exception.
+
+    The SSBO is linked up with the compute shader in ConfigureCompute(...).
+    The VAO is initialized in ConfigureRender(...).
+
 Parameters: None
 Returns:    None
 Creator: John Cox, 9-20-2016
 -----------------------------------------------------------------------------------------------*/
 SsboBase::SsboBase() :
-    _hasBeenInitialized(false),
+    //_hasBeenInitialized(false),
     _vaoId(0),
     _bufferId(0),
     _drawStyle(0),
     _numVertices(0)
 {
+    glGenBuffers(1, &_bufferId);
+    glGenVertexArrays(1, &_vaoId);
 }
 
 /*-----------------------------------------------------------------------------------------------
