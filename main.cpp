@@ -218,10 +218,10 @@ void Init()
     gParticleBuffer.ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderUpdateKey));
     gParticleBuffer.ConfigureRender(shaderStorageRef.GetShaderProgram(renderParticlesShaderKey));
 
-    //glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 45.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-    //windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(-0.1f, -0.05f, 0.0f));
-    glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-    windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(0.0f, 0.0f, 0.0f));
+    glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 45.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+    windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(-0.1f, -0.05f, 0.0f));
+    //glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+    //windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(0.0f, 0.0f, 0.0f));
 
     glm::vec4 particleRegionCenter = windowSpaceTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
     float particleRegionRadius = 0.8f;
@@ -248,7 +248,7 @@ void Init()
     // start up the encapsulation of the CPU side of the computer shader
     gpParticleReseter = new ComputeParticleReset(MAX_PARTICLE_COUNT, computeShaderResetKey);
     gpParticleReseter->AddEmitter(gpParticleEmitterBar1);
-    //gpParticleReseter->AddEmitter(gpParticleEmitterBar2);
+    gpParticleReseter->AddEmitter(gpParticleEmitterBar2);
 
     gpParticleUpdater = new ComputeParticleUpdate(computeShaderUpdateKey);
     gpParticleUpdater->Init(MAX_PARTICLE_COUNT, particleRegionCenter, particleRegionRadius);
