@@ -32,10 +32,13 @@
     <ClCompile Include="PolygonSsbo.cpp">
       <Filter>Buffers</Filter>
     </ClCompile>
-    <ClCompile Include="ComputeParticleUpdate.cpp">
-      <Filter>Particles</Filter>
-    </ClCompile>
     <ClCompile Include="ComputeParticleReset.cpp">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClCompile>
+    <ClCompile Include="ComputeParticleUpdate.cpp">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClCompile>
+    <ClCompile Include="ParticleQuadTree.cpp">
       <Filter>Particles</Filter>
     </ClCompile>
   </ItemGroup>
@@ -79,21 +82,24 @@
       <Filter>Buffers</Filter>
     </ClInclude>
     <ClInclude Include="ComputeParticleReset.h">
-      <Filter>Particles</Filter>
+      <Filter>ComputeShaderLaunchers</Filter>
     </ClInclude>
     <ClInclude Include="ComputeParticleUpdate.h">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeQuadTreeParticleCollisions.h">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeQuadTreePopulate.h">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClInclude>
+    <ClInclude Include="ComputeQuadTreeReset.h">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClInclude>
+    <ClInclude Include="ParticleQuadTree.h">
       <Filter>Particles</Filter>
     </ClInclude>
     <ClInclude Include="ParticleQuadTreeNode.h">
-      <Filter>Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="ComputeQuadTreeReset.h">
-      <Filter>Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="ComputeQuadTreePopulate.h">
-      <Filter>Particles</Filter>
-    </ClInclude>
-    <ClInclude Include="ComputeQuadTreeParticleCollisions.h">
       <Filter>Particles</Filter>
     </ClInclude>
   </ItemGroup>
@@ -125,6 +131,15 @@
     <None Include="particleUpdate.comp">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="quadTreeReset.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="quadTreePopulate.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="quadTreeParticleCollisions.comp">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <Filter Include="Particles">
@@ -139,7 +154,7 @@
     <Filter Include="Buffers">
       <UniqueIdentifier>{a3e1fffa-b362-4527-9368-9305fcca5aec}</UniqueIdentifier>
     </Filter>
-    <Filter Include="QuadTree">
+    <Filter Include="ComputeShaderLaunchers">
       <UniqueIdentifier>{e20e28db-53e8-45ba-bfd1-761ca3e677cd}</UniqueIdentifier>
     </Filter>
   </ItemGroup>

@@ -54,7 +54,7 @@ Description:
     project, the binding point is determined on the CPU side.  Is that necessary in this demo?  
     No.  Binding points are relevant only to a particular shader and the CPU side needs to, at 
     least, tell OpenGL that the just-created SSBO should be bound to the same binding point 
-    ("binding = 0" here in the shader means glBindBufferBase(..., 0, ...0 in the SSBO setup), 
+    ("binding = 0" here in the shader means glBindBufferBase(..., 0, ...) in the SSBO setup), 
     but if the user doesn't want to handle the binding on both the shader side and the CPU side, 
     then this demo shows how to handle binding entirely on the CPU side.
     
@@ -190,10 +190,10 @@ uniform float uMinParticleVelocity;
 uniform float uDeltaParticleVelocity;
 float NewVelocityBetweenMinAndMax()
 {
-    float velocityVariation = RandomOnRange0To1() * uDeltaParticleVelocity;
-    float velocityMagnitude = uMinParticleVelocity + velocityVariation;
-
-    return velocityMagnitude;
+//    float velocityVariation = RandomOnRange0To1() * uDeltaParticleVelocity;
+//    float velocityMagnitude = uMinParticleVelocity + velocityVariation;
+//
+//    return velocityMagnitude;
 }
 
 /*-----------------------------------------------------------------------------------------------

@@ -6,8 +6,8 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 // like this and cannot be bound dynamically as in ParticleSsbo and PolygonSsbo, so declare 
 // the atomic counters up front to make it easier to keep the numbers straight.
 // Note: Discovered by experience and through this: https://www.opengl.org/wiki/Atomic_Counter.
-layout (binding = 0, offset = 0) uniform atomic_uint acParticleCounter;
-layout (binding = 1, offset = 0) uniform atomic_uint acRandSeed;
+layout (binding = 3, offset = 0) uniform atomic_uint acParticleCounter;
+layout (binding = 4, offset = 0) uniform atomic_uint acRandSeed;
 
 
 /*-----------------------------------------------------------------------------------------------
@@ -63,7 +63,7 @@ Description:
     project, the binding point is determined on the CPU side.  Is that necessary in this demo?  
     No.  Binding points are relevant only to a particular shader and the CPU side needs to, at 
     least, tell OpenGL that the just-created SSBO should be bound to the same binding point 
-    ("binding = 0" here in the shader means glBindBufferBase(..., 0, ...0 in the SSBO setup), 
+    ("binding = 0" here in the shader means glBindBufferBase(..., 0, ...) in the SSBO setup), 
     but if the user doesn't want to handle the binding on both the shader side and the CPU side, 
     then this demo shows how to handle binding entirely on the CPU side.
     

@@ -1,5 +1,8 @@
 #pragma once
 
+#include <string>
+
+
 /*-----------------------------------------------------------------------------------------------
 Description:
     Defines the constructor, which gives the members zero values, and the destructor, which 
@@ -14,7 +17,7 @@ public:
 
     // derived class needs customized Init(...) function to initialize member values
 
-    virtual void ConfigureCompute(unsigned int computeProgramId) = 0;
+    virtual void ConfigureCompute(unsigned int computeProgramId, const std::string &bufferNameInShader) = 0;
     virtual void ConfigureRender(unsigned int renderProgramId, unsigned int drawStyle) = 0;
 
     unsigned int VaoId() const;

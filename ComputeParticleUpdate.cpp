@@ -74,11 +74,13 @@ ComputeParticleUpdate::ComputeParticleUpdate(unsigned int numParticles,
     // Note: It seems that atomic counters must be bound where they are declared and cannot be 
     // bound dynamically like the ParticleSsbo and PolygonSsbo.  So remember to use the SAME buffer 
     // binding base as specified in the shader.
-    // Also Note: Do not bind a buffer base for this one because it is not in the shader.  It is 
-    // instead meant to copy the atomic counter buffer before the copy is mapped to a system 
-    // memory pointer.  Doing this with the actual atomic counter caused a horrific performance 
-    // drop.  It appeared to completely trash the instruction pipeline.
     glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 0, _acParticleCounterBufferId);
+
+    // Note: Do NOT bind a buffer base for the "particle counter copy" atomic counter because it 
+    // is not used in the "particle update" compute shader.  It is instead meant to copy the 
+    // atomic counter buffer before the copy is mapped to a system memory pointer.  Doing this 
+    // with the actual atomic counter caused a horrific performance drop.  It appeared to 
+    // completely trash the instruction pipeline.
 }
 
 /*-----------------------------------------------------------------------------------------------

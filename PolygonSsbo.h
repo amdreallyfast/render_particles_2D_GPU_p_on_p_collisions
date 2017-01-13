@@ -16,7 +16,7 @@ public:
     PolygonSsbo(const std::vector<PolygonFace> &faceCollection);
     virtual ~PolygonSsbo();
 
-    void ConfigureCompute(unsigned int computeProgramId) override;
+    void ConfigureCompute(unsigned int computeProgramId, const std::string &bufferNameInShader) override;
     void ConfigureRender(unsigned int renderProgramId, unsigned int drawStyle) override;
 
 private:

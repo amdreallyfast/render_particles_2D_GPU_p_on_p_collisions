@@ -1,1 +1,322 @@
-#pragma once
+#version 440
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Contains all info necessary for a single node of the quad tree.  It is a dumb container 
+    meant for use only by ParticleQuadTree.
+Creator:    John Cox (12-17-2016)
+-----------------------------------------------------------------------------------------------*/
+uniform uint uMaxParticlesPerQuadTreeNode;
+struct ParticleQuadTreeNode
+{
+    // this array size MUST match the value specified on the CPU side
+    int _indicesForContainedParticles[25];
+    int _numCurrentParticles;
+
+    // for optimizing quad tree population with particles
+    // Note: When the quad tree is populated by particles, each possible node will have its own 
+    // thread in the compute shader.  That means that every node must examine every possible 
+    // particle in the particle SSBO.  when it is time for the node to subdivide (this is why 
+    // the compute shader is divided up between the number of nodes and not the number of 
+    // particles), then this value will be set so that the threads for the child nodes don't 
+    // have to start the particle counting all over again.
+    int _startingParticleIndex;
+
+    int _inUse;
+    int _isSubdivided;
+    int _childNodeIndexTopLeft;
+    int _childNodeIndexTopRight;
+    int _childNodeIndexBottomRight;
+    int _childNodeIndexBottomLeft;
+
+    // left and right edges implicitly X, top and bottom implicitly Y
+    float _leftEdge;
+    float _topEdge;
+    float _rightEdge;
+    float _bottomEdge;
+
+    int _neighborIndexLeft;
+    int _neighborIndexTopLeft;
+    int _neighborIndexTop;
+    int _neighborIndexTopRight;
+    int _neighborIndexRight;
+    int _neighborIndexBottomRight;
+    int _neighborIndexBottom;
+    int _neighborIndexBottomLeft;
+};
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Stores info about a single particle.  Must match the version on the CPU side.
+Creator: John Cox (9-25-2016)
+-----------------------------------------------------------------------------------------------*/
+struct Particle
+{
+    vec4 _pos;
+    vec4 _vel;
+    vec4 _netForce;
+    int _collisionCountThisFrame;
+    float _mass;
+    float _radiusOfInfluence;
+    int _isActive;
+};
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Stores all info necessary to draw a single vertex.
+Creator: John Cox (6-12-2016)
+-----------------------------------------------------------------------------------------------*/
+struct MyVertex
+{
+    glm::vec4 _position;
+    glm::vec4 _normal;
+};
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    This is a simple structure that describes the face of a 2D polygon.  The face begins at P1 
+    and ends at P2.  In this demo, the normal will be used to calculate collisions.
+Creator:    John Cox (9-8-2016)
+-----------------------------------------------------------------------------------------------*/
+struct PolygonFace
+{
+    MyVertex _start;
+    MyVertex _end;
+};
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    The SSBO that contains all the ParticleQuadTreeNodes that this simulation is running.  
+    Rather self-explanatory.
+Creator: John Cox (1-10-2017)
+-----------------------------------------------------------------------------------------------*/
+uniform uint uMaxQuadTreeNodeCount;
+layout (binding = 3, offset = 0) uniform atomic_uint acQuadTreeNodesInUse;
+layout (std430) buffer QuadTreeNodeBuffer
+{
+    ParticleQuadTreeNode AllQuadTreeNodes[];
+};
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    The SSBO that contains all the particles that this simulartion is running.  Rather 
+    self-explanatory.
+    
+    Binding points are relevant only to a particular shader (that is, not to the OpenGL context 
+    as a whole) and are set in the SSBO's ConfigureCompute(...) function.
+Creator: John Cox (9-25-2016)
+-----------------------------------------------------------------------------------------------*/
+uniform uint uMaxParticleCount;
+layout (std430) buffer ParticleBuffer
+{
+    Particle AllParticles[];
+};
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    The SSBO that will contain all polygons necessary to draw the quad tree.  For this demo, it 
+    is only 2D, so each face only contains two vertexes;
+Creator: John Cox (9-25-2016)
+-----------------------------------------------------------------------------------------------*/
+uniform uint uMaxPolygonFaceCount;
+layout (binding = 4, offset = 0) uniform atomic_uint acQuadTreePolygonFacesInUse;
+layout (std430) buffer QuadTreeFaceBuffer
+{
+    PolygonFace AllPolygonFaces[];
+};
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Grabs four unused nodes from the "all nodes" array, sets their bounds as four quadrants of 
+    the parent node that needs to be subdivided, populates them with that node's particles, and 
+    empties the parent node.
+
+Parameters: 
+    nodeIndex       The quad tree node to split
+Returns:    
+    True if all went well, otherwise false.
+Exception:  Safe
+Creator:    John Cox (1-12-2017) (adapted from CPU version, 12-17-2016)
+-----------------------------------------------------------------------------------------------*/
+bool SubdivideNode(int nodeIndex)
+{
+
+}
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Adds the specified particle to the specified node.  If the new particle will push the node 
+    over its particle containment limit, then it subdivides and populates its new children with 
+    its own particles.
+
+    Note: This function does not sanitize the input.  The purpose of this function is to create 
+    a connection between a particle and a node.  Be nice to it and check particle bounds first.
+
+Parameters: 
+    particleIndex   The particle that needs to be added.
+    nodeIndex       The quad tree node to add the particle to.
+Returns:    
+    True if all went well, otherwise false.
+Exception:  Safe
+Creator:    John Cox (1-12-2017) (adapted from CPU version, 12-17-2016)
+-----------------------------------------------------------------------------------------------*/
+bool AddParticleToNode(particleIndex, nodeIndex)
+{
+    int destinationNodeIndex = -1;
+
+    if (node._isSubdivided == 0)
+    {
+        // not subdivided (yet), so add the particle to the provided node
+        int numParticlesThisNode = node._numCurrentParticles;
+        if (numParticlesThisNode == uMaxParticlesPerQuadTreeNode)
+        {
+            // ran out of space, so split the node and add the particles to its children
+            if (!SubdivideNode(nodeIndex))
+            {
+                // no space left
+                return false;
+            }
+
+            // add the particle to this same node again, which will use the "is subdivided" logic
+            destinationNodeIndex = nodeIndex;
+        }
+        else
+        {
+            // END RECURSION
+            // Note: It's ok to use this as an index because the "== MAX" check was already done.
+            node._indicesForContainedParticles[numParticlesThisNode] = particleIndex;
+            node._numCurrentParticles++;
+            return true;
+        }
+    }
+    else
+    {
+        // the node is subdivided, so add the particle to the child nodes
+        float nodeXCenter = (node._leftEdge + node._rightEdge) * 0.5f;
+        float nodeYCenter = (node._bottomEdge + node._topEdge) * 0.5f;
+
+        if (p._pos.x < nodeXCenter)
+        {
+            // left half
+            if (p._pos.y > nodeYCenter)
+            {
+                // top half
+                destinationNodeIndex = node._childNodeIndexTopLeft;
+            }
+            else
+            {
+                // bottom half
+                destinationNodeIndex = node._childNodeIndexBottomLeft;
+            }
+        }
+        else
+        {
+            // right half
+            if (p._pos.y > nodeYCenter)
+            {
+                // top half
+                destinationNodeIndex = node._childNodeIndexTopRight;
+            }
+            else
+            {
+                // bottom half
+                destinationNodeIndex = node._childNodeIndexBottomRight;
+            }
+        }
+    }
+
+    // recursively add this particle
+    return AddParticleToNode(particleIndex, destinationNodeIndex);
+}
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    The compute shader's startup function.  It Governs the addition of particles to the quad 
+    tree.  It calculates which of the default tree nodes the particle is in, and then adds the 
+    particle to it.  AddParticleToNode(...) will handle subdivision and addition of particles to 
+    child nodes.
+Parameters: None
+Returns:    None
+Creator: John Cox (1-12-2017) (adapted from CPU version, 12-17-2016)
+-----------------------------------------------------------------------------------------------*/
+uniform float uParticleRegionRadius;
+uniform vec4 uParticleRegionCenter;
+uniform uint uNumRowsInTreeInitial;
+uniform uint uNumColumnsInTreeInitial;
+void main()
+{
+    uint index = gl_GlobalInvocationID.x;
+    if (index < uMaxQuadTreeNodeCount)
+    {
+        ParticleQuadTreeNode node = AllQuadTreeNodes[index];
+
+        float xIncrementPerColumn = 2.0f * uParticleRegionRadius / uNumColumnsInTreeInitial;
+        float yIncrementPerRow = 2.0f * uParticleRegionRadius / uNumRowsInTreeInitial;
+
+        // is invertex to save on division cost for every particle
+        float inverseXIncrementPerColumn = 1.0f / xIncrementPerColumn;
+        float inverseYIncrementPerRow = 1.0f / yIncrementPerRow;
+
+        for (unsigned int particleIndex = 0; particleIndex < uMaxParticleCount; particleIndex++)
+        {
+            if (AllParticles[particleIndex]._isActive == 0)
+            {
+                // only add active particles
+                continue;
+            }
+
+            // I can't think of an intuitive explanation for why the following math works, but it does (I worked it out by hand, got it wrong, experimented, and got it right)
+            // Note: Row bounds are on the Y axis, column bounds are on the X axis.  I always get them mixed up because a row is horizontal (like X) and a column is vertical (like Y).
+            // Also Node:
+            //  col index   = (int)((particle.pos.x - quadTreeLeftEdge) / xIncrementPerColumn);
+            //  row index   = (int)((quadTreeTopEdge - particle.pos.y) / yIncrementPerRow);
+            // 
+            //  Let c = particle region center
+            //  Let r = particle region radius
+            //  Let p = particle
+            //  Then:
+            //  col index = (int)((p.pos.x - (c.x - r)) / xIncrementPerColumn);
+            //  row index = (int)(((c.y + r) - p.pos.y) / yIncrementPerRow);
+            //
+            // Also Also Note: The integer rounding should NOT be rounded to the nearest integer.  Array indices start at 0, so any value between 0 and 1 is considered to be in the 0th index.
+
+            // column
+            float leftEdge = uParticleRegionCenter.x - uParticleRegionRadius;
+            float xDiff = AllParticles[particleIndex]._pos.x - leftEdge;
+            float colFloat = xDiff * inverseXIncrementPerColumn;
+            int colInteger = (int)(colFloat);
+
+            // row
+            float topEdge = uParticleRegionCenter.y + uParticleRegionRadius;
+            float yDiff = topEdge - AllParticles[particleIndex]._pos.y;
+            float rowFloat = yDiff * inverseYIncrementPerRow;
+            int rowInteger = (int)(rowFloat);
+
+            // same index calculation as the tree initialization 
+            int nodeIndex = (rowInteger * uNumColumnsInTreeInitial) + colInteger;
+            AddParticleToNode(particleIndex, nodeIndex);
+        }
+
+        // don't bother resetting the particle indices to 0 because they'll be run over the next 
+        // time that the node is populated with particles
+        node._numCurrentParticles = 0;
+
+        // no subdivision by default
+        node._isSubdivided = 0;
+        node._childNodeIndexTopLeft = -1;
+        node._childNodeIndexTopRight = -1;
+        node._childNodeIndexBottomRight = -1;
+        node._childNodeIndexBottomLeft = -1;
+
+        if (index > uNumStartingNodes)
+        {
+            node._inUse = 0;
+        }
+
+        // write it back
+        AllQuadTreeNodes[index] = node;
+    }
+}
+

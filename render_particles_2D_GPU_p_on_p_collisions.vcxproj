@@ -155,6 +155,7 @@
     <ClCompile Include="OpenGlErrorHandling.cpp" />
     <ClCompile Include="ParticleEmitterBar.cpp" />
     <ClCompile Include="ParticleEmitterPoint.cpp" />
+    <ClCompile Include="ParticleQuadTree.cpp" />
     <ClCompile Include="ParticleSsbo.cpp" />
     <ClCompile Include="PolygonSsbo.cpp" />
     <ClCompile Include="RandomToast.cpp" />
@@ -172,6 +173,9 @@
     <None Include="geometry.vert" />
     <None Include="particleReset.comp" />
     <None Include="particleUpdate.comp" />
+    <None Include="quadTreeParticleCollisions.comp" />
+    <None Include="quadTreePopulate.comp" />
+    <None Include="quadTreeReset.comp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ComputeParticleReset.h" />
@@ -182,6 +186,7 @@
     <ClInclude Include="FreeTypeAtlas.h" />
     <ClInclude Include="FreeTypeEncapsulated.h" />
     <ClInclude Include="MyVertex.h" />
+    <ClInclude Include="ParticleQuadTree.h" />
     <ClInclude Include="ParticleQuadTreeNode.h" />
     <ClInclude Include="PolygonSsbo.h" />
     <ClInclude Include="SsboBase.h" />
