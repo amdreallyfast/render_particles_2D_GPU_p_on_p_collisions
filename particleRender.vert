@@ -27,18 +27,8 @@ void main()
     }
     else
     {
-        if (length(vel) < 0.01)
-        {
-            particleColor = vec4(0.0f, 1.0f, 0.0f, 0.0f);
-        }
-        else
-        {
-            particleColor = vec4(1.0f, 0.0f, 0.0f, 0.0f);
-        }
-        
-
         // active => opaque (alpha = 1) white
-        //particleColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
+        particleColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
         gl_Position = vec4(pos, -0.7f, 1.0f);
     }
 }

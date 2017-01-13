@@ -190,10 +190,10 @@ uniform float uMinParticleVelocity;
 uniform float uDeltaParticleVelocity;
 float NewVelocityBetweenMinAndMax()
 {
-//    float velocityVariation = RandomOnRange0To1() * uDeltaParticleVelocity;
-//    float velocityMagnitude = uMinParticleVelocity + velocityVariation;
-//
-//    return velocityMagnitude;
+    float velocityVariation = RandomOnRange0To1() * uDeltaParticleVelocity;
+    float velocityMagnitude = uMinParticleVelocity + velocityVariation;
+
+    return velocityMagnitude;
 }
 
 /*-----------------------------------------------------------------------------------------------

@@ -289,7 +289,7 @@ void Init()
     std::vector<Particle> allParticles(MAX_PARTICLE_COUNT);
     gpParticleBuffer = new ParticleSsbo(allParticles);
     gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderResetKey), "ParticleBuffer");
-    gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderUpdateKey), "FaceBuffer");
+    gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderUpdateKey), "ParticleBuffer");
     gpParticleBuffer->ConfigureRender(shaderStorageRef.GetShaderProgram(renderParticlesShaderKey), GL_POINTS);
 
     // put the bar emitters across from each and spraying particles toward each other and up so 
