@@ -34,15 +34,21 @@ private:
     unsigned int _totalParticleCount;
     unsigned int _computeProgramId;
 
-    // the atomic counter is used to enforce the number of emitted particles per emitter per 
-    // frame 
-    unsigned int _acParticleCounterBufferId;
+    //unsigned int _acParticleCounterBufferId;
+    //unsigned int _acRandSeedBufferId;
+
+    // the atomic counters are both in a single buffer
+    unsigned int _atomicCounterBufferId;
+
+    // this the atomic counter is used to enforce the number of emitted particles per emitter 
+    // per frame 
+    unsigned int _acParticleCounterOffset;
 
     // another atomic counter is used as a seed for the random hash
     // Note: Rather than needing to seed the position and velocity as I did in the 
     // "single emitter" project, use an atomic counter.  If it reaches maximum unsigned int, 
     // that is ok.  The value will wrap around to 0 and begin again.  
-    unsigned int _acRandSeed;
+    unsigned int _acRandSeedOffset;
 
     // unlike most OpenGL IDs, uniform locations are GLint
     int _unifLocParticleCount;

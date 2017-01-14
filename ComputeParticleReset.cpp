@@ -50,25 +50,22 @@ ComputeParticleReset::ComputeParticleReset(unsigned int numParticles,
     glUniform1ui(_unifLocParticleCount, numParticles);
 
     // atomic counter initialization courtesy of geeks3D (and my use of glBufferData(...) 
-    // instead of glMapBuffer(...)
+    // instead of glMapBuffer(...) and atomic counter arrays courtesy of lighthouse3d
     // http://www.geeks3d.com/20120309/opengl-4-2-atomic-counter-demo-rendering-order-of-fragments/
+    // http://www.lighthouse3d.com/tutorials/opengl-atomic-counters/
 
-    // particle counter
-    // Note: Don't bother giving it an initial value.  It is updated on every call to 
-    // ResetParticles(...).
-    glGenBuffers(1, &_acParticleCounterBufferId);
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _acParticleCounterBufferId);
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_DRAW);
+    // allocate space for both atomic counters, but don't bother giving them data until 
+    // ResetParticles(...)
+    glGenBuffers(1, &_atomicCounterBufferId);
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint) * 2, 0, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 
-    // starting up the random hash counter
-    // Note: This value is also updated on every call to ResetParticles(...), so don't give it 
-    // an initial value.  DO seed random though.
+    // both atomic counters are in the same buffer, and they are 32bit unsigned integers, so 
+    // they are 4 bytes apart
     srand(time(0));
-    glGenBuffers(1, &_acRandSeed);
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _acRandSeed);
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_DRAW);
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
+    _acParticleCounterOffset = 0;
+    _acRandSeedOffset = 4;
 
     glUseProgram(_computeProgramId);
 
@@ -76,8 +73,7 @@ ComputeParticleReset::ComputeParticleReset(unsigned int numParticles,
     // Note: It seems that atomic counters must be bound where they are declared and cannot be 
     // bound dynamically like the ParticleSsbo and PolygonSsbo.  So remember to use the SAME buffer 
     // binding base as specified in the shader.
-    glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 3, _acParticleCounterBufferId);
-    glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 4, _acRandSeed);
+    glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 1, _atomicCounterBufferId);
 }
 
 /*-----------------------------------------------------------------------------------------------
@@ -89,8 +85,7 @@ Creator:    John Cox (11-24-2016)
 -----------------------------------------------------------------------------------------------*/
 ComputeParticleReset::~ComputeParticleReset()
 {
-    glDeleteBuffers(1, &_acParticleCounterBufferId);
-    glDeleteBuffers(1, &_acRandSeed);
+    glDeleteBuffers(1, &_atomicCounterBufferId);
 }
 
 /*-----------------------------------------------------------------------------------------------
@@ -157,6 +152,7 @@ void ComputeParticleReset::ResetParticles(unsigned int particlesPerEmitterPerFra
     }
 
     GLuint acResetCounterValue = 0;
+    GLuint acRandSeed = rand();
 
     // spreading the particles evenly between multiple emitters is done by letting all the 
     // particle emitters have a go at all the inactive particles one by one, so all particles 
@@ -171,21 +167,18 @@ void ComputeParticleReset::ResetParticles(unsigned int particlesPerEmitterPerFra
 
     glUseProgram(_computeProgramId);
 
-    // give the rand seed some variance from the last frame
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _acRandSeed);
-    GLuint acRandSeed = rand();
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), (void *)&_acRandSeed, GL_DYNAMIC_DRAW);
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
-
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _acParticleCounterBufferId);
     glUniform1ui(_unifLocMaxParticleEmitCount, particlesPerEmitterPerFrame);
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
 
-    // give all point emitters a chance to reactive inactive particles at their positions
+    // give the rand seed some variance from the last frame
+    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acRandSeedOffset, sizeof(GLuint), &acRandSeed);
+
+    // give all point emitters a chance to reactivate inactive particles at their positions
     glUniform1ui(_unifLocUsePointEmitter, 1);
     for (size_t pointEmitterCount = 0; pointEmitterCount < _pointEmitters.size(); pointEmitterCount++)
     {
         // reset everything necessary to control the emission parameters for this emitter
-        glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), (void *)&acResetCounterValue);
+        glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acParticleCounterOffset, sizeof(GLuint), (void *)&acResetCounterValue);
 
         const ParticleEmitterPoint *emitter = _pointEmitters[pointEmitterCount];
         glUniform1f(_unifLocMinParticleVelocity, emitter->GetMinVelocity());
@@ -213,7 +206,7 @@ void ComputeParticleReset::ResetParticles(unsigned int particlesPerEmitterPerFra
     glUniform1ui(_unifLocUsePointEmitter, 0);
     for (size_t barEmitterCount = 0; barEmitterCount < _barEmitters.size(); barEmitterCount++)
     {
-        glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), (void *)&acResetCounterValue);
+        glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acParticleCounterOffset, sizeof(GLuint), (void *)&acResetCounterValue);
 
         const ParticleEmitterBar *emitter = _barEmitters[barEmitterCount];
         glUniform1f(_unifLocMinParticleVelocity, emitter->GetMinVelocity());

@@ -9,8 +9,8 @@ layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 // Also Note: MUST use a unique binding unless you want these atomic counters to be identical to 
 // the atomic counters in another shader.  Discovered by experience.  Even though this is a 
 // different shader than the "particle update" compute shader, the layout binding holds.
-layout (binding = 3, offset = 0) uniform atomic_uint acResetParticleCounter;
-layout (binding = 4, offset = 0) uniform atomic_uint acRandSeed;
+layout (binding = 1, offset = 0) uniform atomic_uint acResetParticleCounter;
+layout (binding = 1, offset = 4) uniform atomic_uint acRandSeed;
 
 /*-----------------------------------------------------------------------------------------------
 Description:
