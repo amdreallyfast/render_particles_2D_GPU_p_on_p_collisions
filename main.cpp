@@ -253,6 +253,16 @@ void Init()
     shaderStorageRef.AddShaderFile(computeShaderResetKey, "particleReset.comp", GL_COMPUTE_SHADER);
     shaderStorageRef.LinkShader(computeShaderResetKey);
 
+    std::string computeShaderQuadTreeResetKey = "compute quad tree reset";
+    shaderStorageRef.NewShader(computeShaderQuadTreeResetKey);
+    shaderStorageRef.AddShaderFile(computeShaderQuadTreeResetKey, "quadTreeReset.comp", GL_COMPUTE_SHADER);
+    shaderStorageRef.LinkShader(computeShaderQuadTreeResetKey);
+
+    std::string computeQuadTreePopulateKey = "compute quad tree populate";
+    shaderStorageRef.NewShader(computeQuadTreePopulateKey);
+    shaderStorageRef.AddShaderFile(computeQuadTreePopulateKey, "quadTreePopulate.comp", GL_COMPUTE_SHADER);
+    shaderStorageRef.LinkShader(computeQuadTreePopulateKey);
+
     // a render shader specifically for the particles (particle color may change depending on 
     // particle state, so it isn't the same as the geometry's render shader)
     std::string renderParticlesShaderKey = "render particles";

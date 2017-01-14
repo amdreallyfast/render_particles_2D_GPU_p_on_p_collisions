@@ -29,6 +29,8 @@ public:
     static const int _NUM_ROWS_IN_TREE_INITIAL = 8;
     static const int _NUM_COLUMNS_IN_TREE_INITIAL = 8;
     static const int _NUM_STARTING_NODES = _NUM_ROWS_IN_TREE_INITIAL * _NUM_COLUMNS_IN_TREE_INITIAL;
+
+    // if you change this, MUST also change the array size of atomic counters in quadTreePopulate.comp
     static const int _MAX_NODES = _NUM_STARTING_NODES * 8;
 
     ParticleQuadTreeNode _allQuadTreeNodes[_MAX_NODES];

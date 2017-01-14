@@ -63,7 +63,7 @@ ComputeParticleReset::ComputeParticleReset(unsigned int numParticles,
 
     // both atomic counters are in the same buffer, and they are 32bit unsigned integers, so 
     // they are 4 bytes apart
-    srand(time(0));
+    srand(static_cast<unsigned int>(time(nullptr)));
     _acParticleCounterOffset = 0;
     _acRandSeedOffset = 4;
 
