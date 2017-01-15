@@ -32,6 +32,7 @@ private:
     unsigned int _totalParticleCount;
     unsigned int _activeParticleCount;
     unsigned int _computeProgramId;
+    unsigned int *_acCopyBufferMappedPtr;
 
     // the atomic counter is used to count the total number of active particles after this 
     // update
