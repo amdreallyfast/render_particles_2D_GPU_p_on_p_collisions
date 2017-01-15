@@ -59,34 +59,13 @@ ComputeParticleUpdate::ComputeParticleUpdate(unsigned int numParticles,
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _acParticleCounterBufferId);
     GLuint atomicCounterResetVal = 0;
     glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), (void *)&atomicCounterResetVal, GL_DYNAMIC_DRAW);
-
-    // set up for persistant mapping
-    // Note: This approach to reading the atomic counter allows me to avoid the massive performance hit of mapping the "active particles" atomic counter directly and avoid the inconvenience of having to make an additional atomic counter as a copy buffer, as I did in the "render particles 2D GPU multiple emitters" demo.
-    // Also Node:
-    // - Map for reading: Allows me to get a virtual pointer to the buffer data for reading only.  Attempting to write to it will cause OpenGL to spit out an error and the write won't work.  I don't know how OpenGL does this, but it works.
-    // - Map persistant: Allows the virtual pointer to remain valid as long as the buffer is mapped, even during draw calls.  (??is this what I want??_
-    // - Map coherent: Writes from the GPU to the buffer storage will become visible to this pointer automatically.  Without this bit, I would have to manually call some kind of flushing function.
-    // - Map dynamic: Valid in glBufferStorage(...), not valid in glMapBufferRange(...).  Allows the buffer to be updated via calls to glBufferSubData(...).  This is necessary to reset the "active particles" atomic counter on every frame.
-    GLbitfield flags = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-    glBufferStorage(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), 0, flags | GL_DYNAMIC_STORAGE_BIT);
-    void *bufferPtr = glMapBufferRange(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(GLuint), flags);
-    _acCopyBufferMappedPtr = static_cast<unsigned int *>(bufferPtr);
-
-
-
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 
-    //// the atomic counter copy buffer follows suit
-    //glGenBuffers(1, &_acParticleCounterCopyBufferId);
-    //glBindBuffer(GL_COPY_WRITE_BUFFER, _acParticleCounterCopyBufferId);
-    //glBufferData(GL_COPY_WRITE_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_DRAW);
-
-    //GLbitfield flags = GL_MAP_READ_BIT | GL_MAP_PERSISTENT_BIT | GL_MAP_COHERENT_BIT;
-    //glBufferStorage(GL_COPY_WRITE_BUFFER, sizeof(GLuint), 0, flags);
-    //void *bufferPtr = glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, sizeof(GLuint), flags);
-    //_acCopyBufferMappedPtr = static_cast<unsigned int *>(bufferPtr);
-
-    //glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+    // the atomic counter copy buffer follows suit
+    glGenBuffers(1, &_acParticleCounterCopyBufferId);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, _acParticleCounterCopyBufferId);
+    glBufferData(GL_COPY_WRITE_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
 
     // cleanup
     glUseProgram(0);
@@ -149,27 +128,21 @@ void ComputeParticleUpdate::Update(const float deltaTimeSec)
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
     glUseProgram(0);
 
-    //// now that all active particles have updated, check how many active particles exist 
-    //// Note: Thanks to this post for prompting me to learn about buffer copying to solve this 
-    //// "extract atomic counter from compute shader" issue.
-    //// (http://gamedev.stackexchange.com/questions/93726/what-is-the-fastest-way-of-reading-an-atomic-counter) 
-    //glBindBuffer(GL_COPY_READ_BUFFER, _acParticleCounterBufferId);
-    //glBindBuffer(GL_COPY_WRITE_BUFFER, _acParticleCounterCopyBufferId);
-    //glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, sizeof(GLuint));
-    //glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-    //glBindBuffer(GL_COPY_READ_BUFFER, 0);
-
-
-
-    //void *bufferPtr = glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, sizeof(GLuint), GL_MAP_READ_BIT);
-    //unsigned int *particleCountPtr = static_cast<unsigned int *>(bufferPtr);
-    //_activeParticleCount = *particleCountPtr;
-    _activeParticleCount = *_acCopyBufferMappedPtr;
-    //glUnmapBuffer(GL_COPY_WRITE_BUFFER);
+    // now that all active particles have updated, check how many active particles exist 
+    // Note: Thanks to this post for prompting me to learn about buffer copying to solve this 
+    // "extract atomic counter from compute shader" issue.
+    // (http://gamedev.stackexchange.com/questions/93726/what-is-the-fastest-way-of-reading-an-atomic-counter) 
+    glBindBuffer(GL_COPY_READ_BUFFER, _acParticleCounterBufferId);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, _acParticleCounterCopyBufferId);
+    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, sizeof(GLuint));
+    void *bufferPtr = glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, sizeof(GLuint), GL_MAP_READ_BIT);
+    unsigned int *particleCountPtr = static_cast<unsigned int *>(bufferPtr);
+    _activeParticleCount = *particleCountPtr;
+    glUnmapBuffer(GL_COPY_WRITE_BUFFER);
 
     // cleanup
-    //glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-    //glBindBuffer(GL_COPY_READ_BUFFER, 0);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+    glBindBuffer(GL_COPY_READ_BUFFER, 0);
 }
 
 /*-----------------------------------------------------------------------------------------------
