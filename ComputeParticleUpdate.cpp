@@ -58,13 +58,13 @@ ComputeParticleUpdate::ComputeParticleUpdate(unsigned int numParticles,
     glGenBuffers(1, &_acParticleCounterBufferId);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _acParticleCounterBufferId);
     GLuint atomicCounterResetVal = 0;
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), (void *)&atomicCounterResetVal, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint), (void *)&atomicCounterResetVal, GL_DYNAMIC_READ);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 
     // the atomic counter copy buffer follows suit
     glGenBuffers(1, &_acParticleCounterCopyBufferId);
     glBindBuffer(GL_COPY_WRITE_BUFFER, _acParticleCounterCopyBufferId);
-    glBufferData(GL_COPY_WRITE_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_DRAW);
+    glBufferData(GL_COPY_WRITE_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_COPY);
     glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
 
     // cleanup

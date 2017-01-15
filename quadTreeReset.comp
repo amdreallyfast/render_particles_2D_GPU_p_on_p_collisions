@@ -2,7 +2,6 @@
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 
-
 /*-----------------------------------------------------------------------------------------------
 Description:
     Contains all info necessary for a single node of the quad tree.  It is a dumb container 
@@ -47,8 +46,13 @@ struct ParticleQuadTreeNode
     int _neighborIndexBottomLeft;
 };
 
-// TODO: header
-uniform uint uMaxQuadTreeNodeCount;
+/*-----------------------------------------------------------------------------------------------
+Description:
+    The SSBO that contains all the ParticleQuadTreeNodes that this simulation is running.  
+    Rather self-explanatory.
+Creator: John Cox (1-10-2017)
+-----------------------------------------------------------------------------------------------*/
+uniform uint uMaxNodes;
 uniform uint uNumStartingNodes;
 layout (std430) buffer QuadTreeNodeBuffer
 {
@@ -65,36 +69,39 @@ Creator: John Cox (1-10-2017)
 void main()
 {
     uint index = gl_GlobalInvocationID.x;
-    if (index < uMaxQuadTreeNodeCount)
+    if (index >= uMaxNodes)
     {
-        // make a copy of the node, update its info, and write it back
-        // Note: Cache coherency demands that all access to a particular piece of memory end up 
-        // with the same piece of data.  If I were only reading from a particular piece of 
-        // memory, then I could get away with not make a copy, but if I'm writing to that 
-        // memory, then any updates to the cached memory must become visible in the SSBO memory, 
-        // and than can slow things down.  This compute shader invocation doesn't care what the 
-        // other quadTreeReset.comp invocations are doing with their nodes.  It only cares about 
-        // this node.  So to avoid the overhead of ltos of memory synchronization due to writes, 
-        // make a copy of this node, update its info, and write to the SSBO once.
-        ParticleQuadTreeNode node = AllQuadTreeNodes[index];
-
-        // don't bother resetting the particle indices to 0 because they'll be run over the next 
-        // time that the node is populated with particles
-        node._numCurrentParticles = 0;
-
-        // no subdivision by default
-        node._isSubdivided = 0;
-        node._childNodeIndexTopLeft = -1;
-        node._childNodeIndexTopRight = -1;
-        node._childNodeIndexBottomRight = -1;
-        node._childNodeIndexBottomLeft = -1;
-
-        if (index < uNumStartingNodes)
-        {
-            node._inUse = 0;
-        }
-
-        // write it back
-        AllQuadTreeNodes[index] = node;
+        return;
     }
+
+    // make a copy of the node, update its info, and write it back
+    // Note: Cache coherency demands that all access to a particular piece of memory end up 
+    // with the same piece of data.  If I were only reading from a particular piece of 
+    // memory, then I could get away with not make a copy, but if I'm writing to that 
+    // memory, then any updates to the cached memory must become visible in the SSBO memory, 
+    // and than can slow things down.  This compute shader invocation doesn't care what the 
+    // other quadTreeReset.comp invocations are doing with their nodes.  It only cares about 
+    // this node.  So to avoid the overhead of ltos of memory synchronization due to writes, 
+    // make a copy of this node, update its info, and write to the SSBO once.
+    ParticleQuadTreeNode node = AllQuadTreeNodes[index];
+
+    // don't bother resetting the particle indices to 0 because they'll be run over the next 
+    // time that the node is populated with particles
+    node._numCurrentParticles = 0;
+
+    // no subdivision by default
+    node._isSubdivided = 0;
+    node._childNodeIndexTopLeft = -1;
+    node._childNodeIndexTopRight = -1;
+    node._childNodeIndexBottomRight = -1;
+    node._childNodeIndexBottomLeft = -1;
+
+    if (index < uNumStartingNodes)
+    {
+        node._inUse = 0;
+    }
+
+    // write it back
+    AllQuadTreeNodes[index] = node;
+    
 }

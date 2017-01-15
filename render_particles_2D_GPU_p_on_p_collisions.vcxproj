@@ -148,6 +148,8 @@
   <ItemGroup>
     <ClCompile Include="ComputeParticleReset.cpp" />
     <ClCompile Include="ComputeParticleUpdate.cpp" />
+    <ClCompile Include="ComputeQuadTreePopulate.cpp" />
+    <ClCompile Include="ComputeQuadTreeReset.cpp" />
     <ClCompile Include="FreeTypeAtlas.cpp" />
     <ClCompile Include="FreeTypeEncapsulated.cpp" />
     <ClCompile Include="main.cpp" />

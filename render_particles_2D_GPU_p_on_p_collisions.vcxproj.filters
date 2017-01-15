@@ -41,6 +41,12 @@
     <ClCompile Include="ParticleQuadTree.cpp">
       <Filter>Particles</Filter>
     </ClCompile>
+    <ClCompile Include="ComputeQuadTreeReset.cpp">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClCompile>
+    <ClCompile Include="ComputeQuadTreePopulate.cpp">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="OpenGlErrorHandling.h" />

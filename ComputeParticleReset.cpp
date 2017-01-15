@@ -58,7 +58,7 @@ ComputeParticleReset::ComputeParticleReset(unsigned int numParticles,
     // ResetParticles(...)
     glGenBuffers(1, &_atomicCounterBufferId);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint) * 2, 0, GL_DYNAMIC_DRAW);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint) * 2, 0, GL_DYNAMIC_READ);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 
     // both atomic counters are in the same buffer, and they are 32bit unsigned integers, so 

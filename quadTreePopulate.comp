@@ -1,13 +1,13 @@
 #version 440
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-layout (binding = 3, offset = 0) uniform atomic_uint acQuadTreeNodesInUse;
-layout (binding = 3, offset = 4) uniform atomic_uint acQuadTreeNodeSubdivisionCrudeMutex;
-layout (binding = 3, offset = 8) uniform atomic_uint acQuadTreePolygonFacesInUse;
-layout (binding = 3, offset = 12) uniform atomic_uint acQuadTreePolygonFacesCrudeMutex;
+layout (binding = 3, offset = 0) uniform atomic_uint acNodesInUse;
+layout (binding = 3, offset = 4) uniform atomic_uint acPolygonFacesInUse;
+layout (binding = 3, offset = 8) uniform atomic_uint acNodeSubdivisionCrudeMutex;
+layout (binding = 3, offset = 12) uniform atomic_uint acPolygonFacesCrudeMutex;
 
 // MUST match or exceed the max number of quad tree nodes in ParticleQuadTree.h
-layout (binding = 3, offset = 16) uniform atomic_uint acQuadTreeNodeCrudeMutexes[512];
+layout (binding = 3, offset = 16) uniform atomic_uint acNodeAccessCrudeMutexes[512];
 
 
 /*-----------------------------------------------------------------------------------------------
@@ -16,7 +16,7 @@ Description:
     meant for use only by ParticleQuadTree.
 Creator:    John Cox (12-17-2016)
 -----------------------------------------------------------------------------------------------*/
-uniform uint uMaxParticlesPerQuadTreeNode;
+uniform uint uMaxParticlesPerNode;
 struct ParticleQuadTreeNode
 {
     // this array size MUST match the value specified on the CPU side
@@ -94,10 +94,10 @@ Description:
     Rather self-explanatory.
 Creator: John Cox (1-10-2017)
 -----------------------------------------------------------------------------------------------*/
-uniform uint uMaxQuadTreeNodeCount;
+uniform uint uMaxNodes;
 layout (std430) buffer QuadTreeNodeBuffer
 {
-    ParticleQuadTreeNode AllQuadTreeNodes[];
+    ParticleQuadTreeNode AllNodes[];
 };
 
 /*-----------------------------------------------------------------------------------------------
@@ -109,7 +109,7 @@ Description:
     as a whole) and are set in the SSBO's ConfigureCompute(...) function.
 Creator: John Cox (9-25-2016)
 -----------------------------------------------------------------------------------------------*/
-uniform uint uMaxParticleCount;
+uniform uint uMaxParticles;
 layout (std430) buffer ParticleBuffer
 {
     Particle AllParticles[];
@@ -121,7 +121,7 @@ Description:
     is only 2D, so each face only contains two vertexes;
 Creator: John Cox (9-25-2016)
 -----------------------------------------------------------------------------------------------*/
-uniform uint uMaxPolygonFaceCount;
+uniform uint uMaxPolygonFaces;
 layout (std430) buffer QuadTreeFaceBuffer
 {
     PolygonFace AllPolygonFaces[];
@@ -134,34 +134,34 @@ layout (std430) buffer QuadTreeFaceBuffer
 bool GenerateFacesForNode(uint nodeIndex)
 {
     // acquire the crude mutex
-    while (atomicCounterIncrement(acQuadTreePolygonFacesCrudeMutex) > 1)
+    while (atomicCounterIncrement(acPolygonFacesCrudeMutex) > 1)
     {
-        atomicCounterDecrement(acQuadTreePolygonFacesCrudeMutex);
+        atomicCounterDecrement(acPolygonFacesCrudeMutex);
     }
 
     // return immediately if there are not enough faces
-    if (atomicCounter(acQuadTreePolygonFacesInUse) > (uMaxPolygonFaceCount - 4))
+    if (atomicCounter(acPolygonFacesInUse) > (uMaxPolygonFaces - 4))
     {
         // not enough nodes to subdivide again, so release the cude mutex on node subdivision
-        atomicCounterDecrement(acQuadTreePolygonFacesCrudeMutex);
+        atomicCounterDecrement(acPolygonFacesCrudeMutex);
         return false;
     }
 
     // acquire 4 new faces
-    uint face1Index = atomicCounterIncrement(acQuadTreePolygonFacesInUse);
-    uint face2Index = atomicCounterIncrement(acQuadTreePolygonFacesInUse);
-    uint face3Index = atomicCounterIncrement(acQuadTreePolygonFacesInUse);
-    uint face4Index = atomicCounterIncrement(acQuadTreePolygonFacesInUse);
+    uint face1Index = atomicCounterIncrement(acPolygonFacesInUse);
+    uint face2Index = atomicCounterIncrement(acPolygonFacesInUse);
+    uint face3Index = atomicCounterIncrement(acPolygonFacesInUse);
+    uint face4Index = atomicCounterIncrement(acPolygonFacesInUse);
 
     // release the crude mutex
-    atomicCounterDecrement(acQuadTreePolygonFacesCrudeMutex);
+    atomicCounterDecrement(acPolygonFacesCrudeMutex);
 
     // this node has been accessed enough by this time that it's probably in the cache, so don't 
     // make a copy of the whole node and instead just look up the edges 
-    float nodeTop = AllQuadTreeNodes[nodeIndex]._topEdge;
-    float nodeRight = AllQuadTreeNodes[nodeIndex]._rightEdge;
-    float nodeBottom = AllQuadTreeNodes[nodeIndex]._bottomEdge;
-    float nodeLeft = AllQuadTreeNodes[nodeIndex]._leftEdge;
+    float nodeTop = AllNodes[nodeIndex]._topEdge;
+    float nodeRight = AllNodes[nodeIndex]._rightEdge;
+    float nodeBottom = AllNodes[nodeIndex]._bottomEdge;
+    float nodeLeft = AllNodes[nodeIndex]._leftEdge;
 
     vec4 topLeft = vec4(nodeLeft, nodeTop, 0, 1);
     vec4 topRight = vec4(nodeRight, nodeTop, 0, 1);
@@ -219,37 +219,37 @@ Creator:    John Cox (1-12-2017) (adapted from CPU version, 12-17-2016)
 bool SubdivideNode(uint nodeIndex)
 {
     // restrict access to generating new nodes in order to make sure that the max node count is not exceeded
-    while (atomicCounterIncrement(acQuadTreeNodeSubdivisionCrudeMutex) > 1)
+    while (atomicCounterIncrement(acNodeSubdivisionCrudeMutex) > 1)
     {
-        atomicCounterDecrement(acQuadTreeNodeSubdivisionCrudeMutex);
+        atomicCounterDecrement(acNodeSubdivisionCrudeMutex);
     }
 
     // return immediately if there are not enough nodes for subdivision
     // Note: Each subdivision needs 4 more children.  Suppose there is a maximum of 128 nodes, and currently 124 are in use.  In that case, this condition would be false.  But if, for some reason, there is a maximum of 127 nodes, and again 124 are in use, then this condition would fail and the node would not subdivide.
-    if (atomicCounter(acQuadTreeNodesInUse) > (uMaxQuadTreeNodeCount - 4))
+    if (atomicCounter(acNodesInUse) > (uMaxNodes - 4))
     {
         // not enough nodes to subdivide again, so release the cude mutex on node subdivision
-        atomicCounterDecrement(acQuadTreeNodeSubdivisionCrudeMutex);
+        atomicCounterDecrement(acNodeSubdivisionCrudeMutex);
         return false;
     }
     
     // generate 4 more children
     // Note: Atomic counter incrementing is like an index++ operation.  That is, it returns the current value, THEN increments it, so it is safe to use the return value of an increment on the "nodes in use" atomic counter as a 0-based index.  https://www.khronos.org/opengl/wiki/Atomic_Counter#Operations.
-    uint childNodeIndexTopLeft = atomicCounterIncrement(acQuadTreeNodesInUse);
-    uint childNodeIndexTopRight = atomicCounterIncrement(acQuadTreeNodesInUse);
-    uint childNodeIndexBottomRight = atomicCounterIncrement(acQuadTreeNodesInUse);
-    uint childNodeIndexBottomLeft = atomicCounterIncrement(acQuadTreeNodesInUse);
+    uint childNodeIndexTopLeft = atomicCounterIncrement(acNodesInUse);
+    uint childNodeIndexTopRight = atomicCounterIncrement(acNodesInUse);
+    uint childNodeIndexBottomRight = atomicCounterIncrement(acNodesInUse);
+    uint childNodeIndexBottomLeft = atomicCounterIncrement(acNodesInUse);
 
     // release the cude mutex on node subdivision
-    atomicCounterDecrement(acQuadTreeNodeSubdivisionCrudeMutex);
+    atomicCounterDecrement(acNodeSubdivisionCrudeMutex);
 
     // make a copy of the node and its new children, modify them, and write them back at the end
     // Note: A lot of the members of the ParticleQuadTreeNode need to be accessed.  It will be easier for typing, and possibly more cache friendly, to make a local copy of the nodes that are being read from or written to than to always be accessing the SSBO for every member of every node.
-    ParticleQuadTreeNode nodeCopy = AllQuadTreeNodes[nodeIndex];
-    ParticleQuadTreeNode childTopLeft = AllQuadTreeNodes[childNodeIndexTopLeft];
-    ParticleQuadTreeNode childTopRight = AllQuadTreeNodes[childNodeIndexTopRight];
-    ParticleQuadTreeNode childBottomRight = AllQuadTreeNodes[childNodeIndexBottomRight];
-    ParticleQuadTreeNode childBottomLeft = AllQuadTreeNodes[childNodeIndexBottomLeft];
+    ParticleQuadTreeNode nodeCopy = AllNodes[nodeIndex];
+    ParticleQuadTreeNode childTopLeft = AllNodes[childNodeIndexTopLeft];
+    ParticleQuadTreeNode childTopRight = AllNodes[childNodeIndexTopRight];
+    ParticleQuadTreeNode childBottomRight = AllNodes[childNodeIndexBottomRight];
+    ParticleQuadTreeNode childBottomLeft = AllNodes[childNodeIndexBottomLeft];
 
     // record the child in the node that is being subdivided
     nodeCopy._isSubdivided = 1;
@@ -375,11 +375,11 @@ bool SubdivideNode(uint nodeIndex)
     nodeCopy._numCurrentParticles = 0;
 
     // write back the subdivided node and its new children
-    AllQuadTreeNodes[nodeIndex] = nodeCopy;
-    AllQuadTreeNodes[childNodeIndexTopLeft] = childTopLeft;
-    AllQuadTreeNodes[childNodeIndexTopRight] = childTopRight;
-    AllQuadTreeNodes[childNodeIndexBottomRight] = childBottomRight;
-    AllQuadTreeNodes[childNodeIndexBottomLeft] = childBottomLeft;
+    AllNodes[nodeIndex] = nodeCopy;
+    AllNodes[childNodeIndexTopLeft] = childTopLeft;
+    AllNodes[childNodeIndexTopRight] = childTopRight;
+    AllNodes[childNodeIndexBottomRight] = childBottomRight;
+    AllNodes[childNodeIndexBottomLeft] = childBottomLeft;
 
     // all went well
     return true;
@@ -406,16 +406,25 @@ Creator:    John Cox (1-12-2017) (adapted from CPU version, 12-17-2016)
 -----------------------------------------------------------------------------------------------*/
 uint AddParticleToNode(uint particleIndex, uint nodeIndex)
 {
+    // this crude mutex is necessary to prevent multiple particles from adding themselves to this node at the same time, especially while the node is subdividing
+    while (atomicCounterIncrement(acNodeAccessCrudeMutexes[nodeIndex]) > 1)
+    {
+        // another particle got to it first
+        atomicCounterDecrement(acNodeAccessCrudeMutexes[nodeIndex]);
+    }
+
+    // the atomic counter incremented from 0 to 1, so we have exclusive access to this node
+
     uint destinationNodeIndex = 0;
     uint allDone = 0xffffffff;
     
-    ParticleQuadTreeNode nodeCopy = AllQuadTreeNodes[nodeIndex];
+    ParticleQuadTreeNode nodeCopy = AllNodes[nodeIndex];
 
-    if (AllQuadTreeNodes[nodeIndex]._isSubdivided == 0)
+    if (AllNodes[nodeIndex]._isSubdivided == 0)
     {
         // not subdivided (yet), so add the particle to the provided node
         uint numParticlesThisNode = nodeCopy._numCurrentParticles;
-        if (numParticlesThisNode == uMaxParticlesPerQuadTreeNode)
+        if (numParticlesThisNode == uMaxParticlesPerNode)
         {
             // ran out of space, so split the node and add the particles to its children
             if (!SubdivideNode(nodeIndex))
@@ -431,8 +440,8 @@ uint AddParticleToNode(uint particleIndex, uint nodeIndex)
         {
             // END OF LINE
             // Note: It's ok to use this as an index because the "== MAX" check was already done.
-            AllQuadTreeNodes[nodeIndex]._indicesForContainedParticles[numParticlesThisNode] = particleIndex;
-            AllQuadTreeNodes[nodeIndex]._numCurrentParticles++;
+            AllNodes[nodeIndex]._indicesForContainedParticles[numParticlesThisNode] = particleIndex;
+            AllNodes[nodeIndex]._numCurrentParticles++;
             return allDone;
         }
     }
@@ -474,6 +483,9 @@ uint AddParticleToNode(uint particleIndex, uint nodeIndex)
         }
     }
 
+    // release the hold on this node
+    atomicCounterDecrement(acNodeAccessCrudeMutexes[nodeIndex]);
+
     // this node is subdivided and the particle needs to be added to its children, so this function needs to be called again
     return destinationNodeIndex;
 }
@@ -496,7 +508,7 @@ uniform float uInverseYIncrementPerRow;
 void main()
 {
     uint particleIndex = gl_GlobalInvocationID.x;
-    if (particleIndex >= uMaxParticleCount)
+    if (particleIndex >= uMaxParticles)
     {
         return;
     }
@@ -537,27 +549,18 @@ void main()
     uint rowInteger = uint(floor(rowFloat));
 
     // same index calculation as the tree initialization 
-    uint nodeIndex = (rowInteger * uNumColumnsInTreeInitial) + colInteger;
+    // Note: The initially calculated node may belong to a subdivided node.  The index of the actual node that the particle is added to may be different, hence the "initial".
+    uint initialNodeIndex = (rowInteger * uNumColumnsInTreeInitial) + colInteger;
 
-    // this crude mutex is necessary to prevent multiple particles from adding themselves to this node at the same time, especially while the node is subdividing
-    while (atomicCounterIncrement(acQuadTreeNodeCrudeMutexes[nodeIndex]) > 1)
-    {
-        // another particle got to it first
-        atomicCounterDecrement(acQuadTreeNodeCrudeMutexes[nodeIndex]);
-    }
-
-    // the atomic counter incremented to 1, not 2 (or higher), so it must have been 0 before that, which means that this particle now has exclusive access to this quad tree node
-    
     // recursively navigate the quad tree and add the particle
     // Note: GLSL does not allow recursion.  This loop is the best I could come up with.
     // Also Node: Using 0xffffffff as an "end of recursion" value because the node index needs to work with atomic counters, which can only be uint.  I'd rather not rely on an implicit -1 -> max unsigned int conversion, so I will spell out max 32bit int.
-    uint anotherNodeIndex = AddParticleToNode(particleIndex, nodeIndex);
+    uint anotherNodeIndex = AddParticleToNode(particleIndex, initialNodeIndex);
     while (anotherNodeIndex != 0xffffffff)
     {
         anotherNodeIndex = AddParticleToNode(particleIndex, anotherNodeIndex);
     }
 
-    // done with the node 
-    atomicCounterDecrement(acQuadTreeNodeCrudeMutexes[nodeIndex]);
+    // done; particle has been added
 }
 
