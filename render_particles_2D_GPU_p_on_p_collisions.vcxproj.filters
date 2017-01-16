@@ -47,6 +47,9 @@
     <ClCompile Include="ComputeQuadTreePopulate.cpp">
       <Filter>ComputeShaderLaunchers</Filter>
     </ClCompile>
+    <ClCompile Include="ComputeQuadTreeGenerateGeometry.cpp">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="OpenGlErrorHandling.h" />
@@ -108,6 +111,9 @@
     <ClInclude Include="ParticleQuadTreeNode.h">
       <Filter>Particles</Filter>
     </ClInclude>
+    <ClInclude Include="ComputeQuadTreeGenerateGeometry.h">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <None Include="geometry.frag">
@@ -144,6 +150,9 @@
       <Filter>Shaders</Filter>
     </None>
     <None Include="quadTreeParticleCollisions.comp">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="quadTreeGenerateGeometry.comp">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

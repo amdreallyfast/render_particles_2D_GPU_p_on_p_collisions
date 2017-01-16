@@ -148,6 +148,7 @@
   <ItemGroup>
     <ClCompile Include="ComputeParticleReset.cpp" />
     <ClCompile Include="ComputeParticleUpdate.cpp" />
+    <ClCompile Include="ComputeQuadTreeGenerateGeometry.cpp" />
     <ClCompile Include="ComputeQuadTreePopulate.cpp" />
     <ClCompile Include="ComputeQuadTreeReset.cpp" />
     <ClCompile Include="FreeTypeAtlas.cpp" />
@@ -175,6 +176,7 @@
     <None Include="geometry.vert" />
     <None Include="particleReset.comp" />
     <None Include="particleUpdate.comp" />
+    <None Include="quadTreeGenerateGeometry.comp" />
     <None Include="quadTreeParticleCollisions.comp" />
     <None Include="quadTreePopulate.comp" />
     <None Include="quadTreeReset.comp" />
@@ -182,6 +184,7 @@
   <ItemGroup>
     <ClInclude Include="ComputeParticleReset.h" />
     <ClInclude Include="ComputeParticleUpdate.h" />
+    <ClInclude Include="ComputeQuadTreeGenerateGeometry.h" />
     <ClInclude Include="ComputeQuadTreeParticleCollisions.h" />
     <ClInclude Include="ComputeQuadTreePopulate.h" />
     <ClInclude Include="ComputeQuadTreeReset.h" />

@@ -2,12 +2,10 @@
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 layout (binding = 3, offset = 0) uniform atomic_uint acNodesInUse;
-layout (binding = 3, offset = 4) uniform atomic_uint acPolygonFacesInUse;
-layout (binding = 3, offset = 8) uniform atomic_uint acNodeSubdivisionCrudeMutex;
-layout (binding = 3, offset = 12) uniform atomic_uint acPolygonFacesCrudeMutex;
+layout (binding = 3, offset = 4) uniform atomic_uint acNodeSubdivisionCrudeMutex;
 
 // MUST match or exceed the max number of quad tree nodes in ParticleQuadTree.h
-layout (binding = 3, offset = 16) uniform atomic_uint acNodeAccessCrudeMutexes[512];
+layout (binding = 3, offset = 8) uniform atomic_uint acNodeAccessCrudeMutexes[512];
 
 
 /*-----------------------------------------------------------------------------------------------
@@ -64,32 +62,6 @@ struct Particle
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    Stores all info necessary to draw a single vertex.  This is used for drawing the quad tree's 
-    wireframe.
-Creator: John Cox (6-12-2016)
------------------------------------------------------------------------------------------------*/
-struct MyVertex
-{
-    vec4 _pos;
-
-    // ignored for the quad tree wireframe
-    vec4 _normal;
-};
-
-/*-----------------------------------------------------------------------------------------------
-Description:
-    This is a simple structure that describes the face of a 2D polygon.  The face begins at P1 
-    and ends at P2.  In this demo, the normal will be used to calculate collisions.
-Creator:    John Cox (9-8-2016)
------------------------------------------------------------------------------------------------*/
-struct PolygonFace
-{
-    MyVertex _start;
-    MyVertex _end;
-};
-
-/*-----------------------------------------------------------------------------------------------
-Description:
     The SSBO that contains all the ParticleQuadTreeNodes that this simulation is running.  
     Rather self-explanatory.
 Creator: John Cox (1-10-2017)
@@ -114,94 +86,6 @@ layout (std430) buffer ParticleBuffer
 {
     Particle AllParticles[];
 };
-
-/*-----------------------------------------------------------------------------------------------
-Description:
-    The SSBO that will contain all polygons necessary to draw the quad tree.  For this demo, it 
-    is only 2D, so each face only contains two vertexes;
-Creator: John Cox (9-25-2016)
------------------------------------------------------------------------------------------------*/
-uniform uint uMaxPolygonFaces;
-layout (std430) buffer QuadTreeFaceBuffer
-{
-    PolygonFace AllPolygonFaces[];
-};
-
-
-
-// TODO: header
-// only need to call this for nodes on top of the initial nodes
-bool GenerateFacesForNode(uint nodeIndex)
-{
-    // acquire the crude mutex
-    while (atomicCounterIncrement(acPolygonFacesCrudeMutex) > 1)
-    {
-        atomicCounterDecrement(acPolygonFacesCrudeMutex);
-    }
-
-    // return immediately if there are not enough faces
-    if (atomicCounter(acPolygonFacesInUse) > (uMaxPolygonFaces - 4))
-    {
-        // not enough nodes to subdivide again, so release the cude mutex on node subdivision
-        atomicCounterDecrement(acPolygonFacesCrudeMutex);
-        return false;
-    }
-
-    // acquire 4 new faces
-    uint face1Index = atomicCounterIncrement(acPolygonFacesInUse);
-    uint face2Index = atomicCounterIncrement(acPolygonFacesInUse);
-    uint face3Index = atomicCounterIncrement(acPolygonFacesInUse);
-    uint face4Index = atomicCounterIncrement(acPolygonFacesInUse);
-
-    // release the crude mutex
-    atomicCounterDecrement(acPolygonFacesCrudeMutex);
-
-    // this node has been accessed enough by this time that it's probably in the cache, so don't 
-    // make a copy of the whole node and instead just look up the edges 
-    float nodeTop = AllNodes[nodeIndex]._topEdge;
-    float nodeRight = AllNodes[nodeIndex]._rightEdge;
-    float nodeBottom = AllNodes[nodeIndex]._bottomEdge;
-    float nodeLeft = AllNodes[nodeIndex]._leftEdge;
-
-    vec4 topLeft = vec4(nodeLeft, nodeTop, 0, 1);
-    vec4 topRight = vec4(nodeRight, nodeTop, 0, 1);
-    vec4 bottomRight = vec4(nodeRight, nodeBottom, 0, 1);
-    vec4 bottomLeft = vec4(nodeLeft, nodeBottom, 0, 1);
-
-    // make copies of each new face, set their values, and then write them back
-    PolygonFace face1Copy = AllPolygonFaces[face1Index];
-    PolygonFace face2Copy = AllPolygonFaces[face2Index];
-    PolygonFace face3Copy = AllPolygonFaces[face3Index];
-    PolygonFace face4Copy = AllPolygonFaces[face4Index];
-
-    // the quad tree will be rendered in wireframe only, so don't bother calculating or 
-    // otherwise setting the normal
-
-    // face 1 is across the top 
-    face1Copy._start._pos = topLeft;
-    face1Copy._end._pos = topRight;
-
-    // face 2 is across the right 
-    face2Copy._start._pos = topRight;
-    face2Copy._end._pos = bottomRight;
-
-    // face 3 is across the bottom
-    face3Copy._start._pos = bottomRight;
-    face3Copy._end._pos = bottomLeft;
-
-    // face 4 is across the left
-    face4Copy._start._pos = bottomLeft;
-    face4Copy._end._pos = topLeft;
-
-    // write them back
-    AllPolygonFaces[face1Index] = face1Copy;
-    AllPolygonFaces[face2Index] = face2Copy;
-    AllPolygonFaces[face3Index] = face3Copy;
-    AllPolygonFaces[face4Index] = face4Copy;
-
-    // all went well
-    return true;
-}
 
 /*-----------------------------------------------------------------------------------------------
 Description:
@@ -365,13 +249,6 @@ bool SubdivideNode(uint nodeIndex)
         nodeCopy._indicesForContainedParticles[particleCount] = 0;
     }
 
-    // ignore the return values for now
-    // TODO: ??account for these??
-    GenerateFacesForNode(childNodeIndexTopLeft);
-    GenerateFacesForNode(childNodeIndexTopRight);
-    GenerateFacesForNode(childNodeIndexBottomRight);
-    GenerateFacesForNode(childNodeIndexBottomLeft);
-
     nodeCopy._numCurrentParticles = 0;
 
     // write back the subdivided node and its new children
@@ -492,7 +369,7 @@ uint AddParticleToNode(uint particleIndex, uint nodeIndex)
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    The compute shader's startup function.  It Governs the addition of particles to the quad 
+    The compute shader's startup function.  It governs the addition of particles to the quad 
     tree.  It calculates which of the default tree nodes the particle is in, and then adds the 
     particle to it.  AddParticleToNode(...) will handle subdivision and addition of particles to 
     child nodes.

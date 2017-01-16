@@ -1,30 +1,52 @@
 #include "ComputeQuadTreePopulate.h"
 
 #include "glload/include/glload/gl_4_4.h"
+#include "glm/gtc/type_ptr.hpp"
 #include "ShaderStorage.h"
+
+#include <vector>
+
 
 
 // TODO: header
 ComputeQuadTreePopulate::ComputeQuadTreePopulate(
-    unsigned int maxParticlesPerNode, 
-    unsigned int maxNodes, 
-    unsigned int maxParticles, 
-    unsigned int maxPolygonFaces, 
-    float particleRegionRedius, 
-    const glm::vec4 &particleRegionCenter, 
-    unsigned int numColumnsInTreeInitial, 
+    unsigned int maxParticlesPerNode,
+    unsigned int maxNodes,
+    unsigned int maxParticles,
+    float particleRegionRedius,
+    const glm::vec4 &particleRegionCenter,
+    unsigned int numColumnsInTreeInitial,
     unsigned int numRowsInTreeInitial,
-    const std::string computeShaderKey)
+    unsigned int numNodesInTreeInitial,
+    const std::string computeShaderKey) :
+    _computeProgramId(0),
+    _totalParticles(0),
+    _totalNodes(0),
+    _activeNodes(0),
+    _initialNodes(0),
+    _atomicCounterBufferId(0),
+    _acNodesInUseOffset(0),
+    _acNodeSubdivisionCrudeMutexOffset(0),
+    _acNodeAccessCrudeMutexsOffset(0),
+    _acNodesInUseCopyBufferId(0),
+    _unifLocMaxParticlesPerNode(-1),
+    _unifLocMaxNodes(-1),
+    _unifLocMaxParticles(-1),
+    _unifLocParticleRegionRadius(-1),
+    _unifLocParticleRegionCenter(-1),
+    _unifLocNumColumnsInTreeInitial(-1),
+    _unifLocInverseXIncrementPerColumn(-1),
+    _unifLocInverseYIncrementPerRow(-1)
 {
-    _totalParticleCount = maxParticles;
-    _totalNodeCount = maxNodes;
+    _totalParticles = maxParticles;
+    _totalNodes = maxNodes;
+    _initialNodes = numNodesInTreeInitial;
 
     ShaderStorage &shaderStorageRef = ShaderStorage::GetInstance();
 
     _unifLocMaxParticlesPerNode = shaderStorageRef.GetUniformLocation(computeShaderKey, "uMaxParticlesPerNode");
     _unifLocMaxNodes = shaderStorageRef.GetUniformLocation(computeShaderKey, "uMaxNodes");
     _unifLocMaxParticles = shaderStorageRef.GetUniformLocation(computeShaderKey, "uMaxParticles");
-    _unifLocMaxPolygonFaces = shaderStorageRef.GetUniformLocation(computeShaderKey, "uMaxPolygonFaces");
     _unifLocParticleRegionRadius = shaderStorageRef.GetUniformLocation(computeShaderKey, "uParticleRegionRadius");
     _unifLocParticleRegionCenter = shaderStorageRef.GetUniformLocation(computeShaderKey, "uParticleRegionCenter");
     _unifLocNumColumnsInTreeInitial = shaderStorageRef.GetUniformLocation(computeShaderKey, "uNumColumnsInTreeInitial");
@@ -33,25 +55,32 @@ ComputeQuadTreePopulate::ComputeQuadTreePopulate(
 
     _computeProgramId = shaderStorageRef.GetShaderProgram(computeShaderKey);
 
-    // now set up the atomic counter
-    _acNodesInUseOffset = 0;
-    _acPolygonFacesInUseOffset = 4;
-    _acNodeSubdivisionCrudeMutexOffset = 8;
-    _acPolygonFacesCrudeMutexOffset = 12;
-    _acNodeAccessCrudeMutexsOffset = 16;
-
     glUseProgram(_computeProgramId);
 
-    glGenBuffers(1, &_atomicCounterBufferId);
-    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
-    
+    // uniform initialization
+    // Note: All of these are constant throughout the program.
+    glUniform1ui(_unifLocMaxParticlesPerNode, maxParticlesPerNode);
+    glUniform1ui(_unifLocMaxNodes, maxNodes);
+    glUniform1ui(_unifLocMaxParticles, maxParticles);
+    glUniform1f(_unifLocParticleRegionRadius, particleRegionRedius);
+    glUniform4fv(_unifLocParticleRegionCenter, 1, glm::value_ptr(particleRegionCenter));
+    glUniform1ui(_unifLocNumColumnsInTreeInitial, numColumnsInTreeInitial);
+
+    float xIncrementPerColumn = 2.0f * particleRegionRedius / numColumnsInTreeInitial;
+    float yIncrementPerRow = 2.0f * particleRegionRedius / numRowsInTreeInitial;
+    float inverseXIncrementPerColumn = 1.0f / xIncrementPerColumn;
+    float inverseYIncrementPerRow = 1.0f / yIncrementPerRow;
+    glUniform1f(_unifLocInverseXIncrementPerColumn, inverseXIncrementPerColumn);
+    glUniform1f(_unifLocInverseYIncrementPerRow, inverseYIncrementPerRow);
+
     // atomic counters:
     // - nodes in use
-    // - polygon faces in use
     // - subdivision mutex
-    // - polygon faces access mutex
-    // - node accesss (1 per node)
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint) * (4 + maxNodes), 0, GL_DYNAMIC_READ);
+    // - node access mutexes (1 per node)
+    unsigned int numAtomicCounters = 2 + maxNodes;
+    glGenBuffers(1, &_atomicCounterBufferId);
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint) * numAtomicCounters, 0, GL_DYNAMIC_READ);
 
     // now the copy buffer
     glGenBuffers(1, &_acNodesInUseCopyBufferId);
@@ -64,10 +93,13 @@ ComputeQuadTreePopulate::ComputeQuadTreePopulate(
     glUseProgram(0);
 
     // don't need to have a program or bound buffer to set the buffer base
-    // Note: It seems that atomic counters must be bound where they are declared and cannot be 
-    // bound dynamically like the ParticleSsbo and PolygonSsbo.  So remember to use the SAME buffer 
-    // binding base as specified in the shader.
+    // Note: The binding and the offsets MUST match those in the "quad tree populate" compute shader.
+    _acNodesInUseOffset = 0;
+    _acNodeSubdivisionCrudeMutexOffset = 4;
+    _acNodeAccessCrudeMutexsOffset = 8;
     glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 3, _atomicCounterBufferId);
+
+    // no base binding for the atomic counter copy buffer because that is not used in the shader
 }
 
 // TODO: header
@@ -80,18 +112,50 @@ ComputeQuadTreePopulate::~ComputeQuadTreePopulate()
 void ComputeQuadTreePopulate::PopulateTree()
 {
     // reset atomic counters
-    // calculate number of work groups
-    // dispatch compute 
-    
+    // Note: No program biding is required to bind and set the values of the atomic counters.
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
 
-    /*
-    glBindBuffer(GL_COPY_READ_BUFFER, _acParticleCounterBufferId);
-    glBindBuffer(GL_COPY_WRITE_BUFFER, _acParticleCounterCopyBufferId);
-    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, sizeof(GLuint));
-    unsigned int *ptr = (GLuint*)glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, sizeof(GLuint), GL_MAP_READ_BIT);
-    _activeParticleCount = *ptr;
+    GLuint sizeOfOneAtomicCounter = sizeof(GLuint);
+
+    // "nodes in use" is the number of nodes used in the tree's initial subdivision
+    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodesInUseOffset, sizeOfOneAtomicCounter, &_initialNodes);
+
+    // the mutexes all initialize to 0
+    GLuint nada = 0;
+    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodeSubdivisionCrudeMutexOffset, sizeOfOneAtomicCounter, &nada);
+
+    std::vector<GLuint> allZeros(_totalNodes, 0);
+    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodeAccessCrudeMutexsOffset, sizeOfOneAtomicCounter * _totalNodes, allZeros.data());
+
+    // cleanup
+    glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
+
+
+    // calculate the number of work groups and start the magic
+    GLuint numWorkGroupsX = (_totalParticles / 256) + 1;
+    GLuint numWorkGroupsY = 1;
+    GLuint numWorkGroupsZ = 1;
+    glUseProgram(_computeProgramId);
+    glDispatchCompute(numWorkGroupsX, numWorkGroupsY, numWorkGroupsZ);
+    glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
+    glUseProgram(0);
+
+    // retrieve the number of active nodes in use (printed to screen)
+    glBindBuffer(GL_COPY_READ_BUFFER, _atomicCounterBufferId);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, _acNodesInUseCopyBufferId);
+    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, _acNodesInUseOffset, 0, sizeof(GLuint));
+    void *bufferPtr = glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, sizeof(GLuint), GL_MAP_READ_BIT);
+    unsigned int *nodeCountPtr = static_cast<unsigned int *>(bufferPtr);
+    _activeNodes = *nodeCountPtr;
     glUnmapBuffer(GL_COPY_WRITE_BUFFER);
-*/
+    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+    glBindBuffer(GL_COPY_READ_BUFFER, 0);
+}
+
+// TODO: header
+unsigned int ComputeQuadTreePopulate::NumActiveNodes() const
+{
+    return _activeNodes;
 }
 
 
