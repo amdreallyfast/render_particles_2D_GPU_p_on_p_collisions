@@ -2,7 +2,7 @@
 
 #include <vector>
 #include "ParticleQuadTreeNode.h"
-#include "glm/vec2.hpp"
+#include "glm/vec4.hpp"
 
 /*-----------------------------------------------------------------------------------------------
 Description:
@@ -20,7 +20,7 @@ Creator:    John Cox (1-10-2017)
 class ParticleQuadTree
 {
 public:
-    ParticleQuadTree(const glm::vec2 &particleRegionCenter, float particleRegionRadius);
+    ParticleQuadTree(const glm::vec4 &particleRegionCenter, float particleRegionRadius);
 
     // increase the number of additional nodes as necessary to handle more subdivision
     // Note: This algorithm was built with the compute shader's implementation in mind.  These 
@@ -33,8 +33,8 @@ public:
     // if you change this, MUST also change the array size of atomic counters in quadTreePopulate.comp
     static const int _MAX_NODES = _NUM_STARTING_NODES * 8;
 
-    ParticleQuadTreeNode _allQuadTreeNodes[_MAX_NODES];
-    glm::vec2 _particleRegionCenter;
+    std::vector<ParticleQuadTreeNode> _allQuadTreeNodes;
+    glm::vec4 _particleRegionCenter;
     float _particleRegionRadius;
 
 };

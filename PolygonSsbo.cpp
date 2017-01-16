@@ -13,15 +13,14 @@ Returns:    None
 Creator: John Cox, 9-8-2016
 -----------------------------------------------------------------------------------------------*/
 PolygonSsbo::PolygonSsbo(const std::vector<PolygonFace> &faceCollection) :
-    SsboBase(), // generate buffers
-    _bufferSizeBytes(0)
+    SsboBase()  // generate buffers
 {
     // two vertices per face (used with glDrawArrays(...))
     _numVertices = faceCollection.size() * 2;
 
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, _bufferId);
-    _bufferSizeBytes = sizeof(PolygonFace) * faceCollection.size();
-    glBufferData(GL_SHADER_STORAGE_BUFFER, _bufferSizeBytes, faceCollection.data(), GL_STATIC_DRAW);
+    GLuint bufferSizeBytes = sizeof(PolygonFace) * faceCollection.size();
+    glBufferData(GL_SHADER_STORAGE_BUFFER, bufferSizeBytes, faceCollection.data(), GL_STATIC_DRAW);
 
     // cleanup
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -57,10 +56,16 @@ void PolygonSsbo::ConfigureCompute(unsigned int computeProgramId, const std::str
 
     // see the corresponding area in ParticleSsbo::Init(...) for explanation
     // Note: MUST use the same binding point 
-    GLuint ssboBindingPointIndex = 13;   // or 1, or 5, or 17, or wherever IS UNUSED
+
+    //GLuint ssboBindingPointIndex = 13;   // or 1, or 5, or 17, or wherever IS UNUSED
+    //GLuint storageBlockIndex = glGetProgramResourceIndex(computeProgramId, GL_SHADER_STORAGE_BLOCK, bufferNameInShader.c_str());
+    //glShaderStorageBlockBinding(computeProgramId, storageBlockIndex, ssboBindingPointIndex);
+    //glBindBufferBase(GL_SHADER_STORAGE_BUFFER, ssboBindingPointIndex, _bufferId);
+
     GLuint storageBlockIndex = glGetProgramResourceIndex(computeProgramId, GL_SHADER_STORAGE_BLOCK, bufferNameInShader.c_str());
-    glShaderStorageBlockBinding(computeProgramId, storageBlockIndex, ssboBindingPointIndex);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, ssboBindingPointIndex, _bufferId);
+    glShaderStorageBlockBinding(computeProgramId, storageBlockIndex, _ssboBindingPointIndex);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, _ssboBindingPointIndex, _bufferId);
+
 
     // cleanup
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);

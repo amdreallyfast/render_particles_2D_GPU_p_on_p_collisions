@@ -64,7 +64,7 @@ ComputeParticleUpdate::ComputeParticleUpdate(unsigned int numParticles,
     // the atomic counter copy buffer follows suit
     glGenBuffers(1, &_acParticleCounterCopyBufferId);
     glBindBuffer(GL_COPY_WRITE_BUFFER, _acParticleCounterCopyBufferId);
-    glBufferData(GL_COPY_WRITE_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_DRAW);
+    glBufferData(GL_COPY_WRITE_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_COPY);
     glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
 
     // cleanup

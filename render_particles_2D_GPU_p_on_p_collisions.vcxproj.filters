@@ -50,6 +50,9 @@
     <ClCompile Include="ComputeQuadTreeGenerateGeometry.cpp">
       <Filter>ComputeShaderLaunchers</Filter>
     </ClCompile>
+    <ClCompile Include="QuadTreeNodeSsbo.cpp">
+      <Filter>Buffers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="OpenGlErrorHandling.h" />
@@ -113,6 +116,9 @@
     </ClInclude>
     <ClInclude Include="ComputeQuadTreeGenerateGeometry.h">
       <Filter>ComputeShaderLaunchers</Filter>
+    </ClInclude>
+    <ClInclude Include="QuadTreeNodeSsbo.h">
+      <Filter>Buffers</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>

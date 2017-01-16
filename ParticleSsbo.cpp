@@ -78,10 +78,16 @@ void ParticleSsbo::ConfigureCompute(unsigned int computeProgramId, const std::st
     //  to go nowhere.  So get the bindings straight :).
     // Also Note: Thanks to geeks3.com for the "how to".  
     //  http://www.geeks3d.com/20140704/tutorial-introduction-to-opengl-4-3-shader-storage-buffers-objects-ssbo-demo/
-    GLuint ssboBindingPointIndex = 3;   // or 1, or 5, or 17, or wherever IS UNUSED
+    
+    //GLuint ssboBindingPointIndex = 3;   // or 1, or 5, or 17, or wherever IS UNUSED
+    //GLuint storageBlockIndex = glGetProgramResourceIndex(computeProgramId, GL_SHADER_STORAGE_BLOCK, bufferNameInShader.c_str());
+    //glShaderStorageBlockBinding(computeProgramId, storageBlockIndex, ssboBindingPointIndex);
+    //glBindBufferBase(GL_SHADER_STORAGE_BUFFER, ssboBindingPointIndex, _bufferId);
+
     GLuint storageBlockIndex = glGetProgramResourceIndex(computeProgramId, GL_SHADER_STORAGE_BLOCK, bufferNameInShader.c_str());
-    glShaderStorageBlockBinding(computeProgramId, storageBlockIndex, ssboBindingPointIndex);
-    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, ssboBindingPointIndex, _bufferId);
+    glShaderStorageBlockBinding(computeProgramId, storageBlockIndex, _ssboBindingPointIndex);
+    glBindBufferBase(GL_SHADER_STORAGE_BUFFER, _ssboBindingPointIndex, _bufferId);
+
 
     // cleanup
     glBindBuffer(GL_SHADER_STORAGE_BUFFER, 0);
@@ -115,9 +121,13 @@ void ParticleSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int dr
     // do NOT call glBufferData(...) because it was called earlier for the shader storage buffer
 
     // vertex attribute order is same as the structure
-    // (1) position
-    // (2) velocity
-    // (3) "is active" flag
+    // - glm::vec4 _position;
+    // - glm::vec4 _velocity;
+    // - glm::vec4 _netForce;
+    // - int _collisionCountThisFrame;
+    // - float _mass;
+    // - float _radiusOfInfluence;
+    // - int _isActive;
 
     unsigned int vertexArrayIndex = 0;
     unsigned int bufferStartOffset = 0;

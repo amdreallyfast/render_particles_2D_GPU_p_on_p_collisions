@@ -13,8 +13,11 @@ Returns:    None
 Exception:  Safe
 Creator:    John Cox (12-17-2016)
 -----------------------------------------------------------------------------------------------*/
-ParticleQuadTree::ParticleQuadTree(const glm::vec2 &particleRegionCenter, float particleRegionRadius)
+ParticleQuadTree::ParticleQuadTree(const glm::vec4 &particleRegionCenter, float particleRegionRadius)
 {
+    // allocate space for the nodes
+    _allQuadTreeNodes.resize(_MAX_NODES);
+
     _particleRegionCenter = particleRegionCenter;
     _particleRegionRadius = particleRegionRadius;
 

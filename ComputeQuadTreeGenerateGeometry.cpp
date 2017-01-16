@@ -7,9 +7,11 @@
 ComputeQuadTreeGenerateGeometry::ComputeQuadTreeGenerateGeometry(unsigned int maxNodes, unsigned int maxPolygonFaces, const std::string &computeShaderKey) :
     _computeProgramId(0),
     _totalNodes(0),
+    _facesInUse(0),
     _atomicCounterBufferId(0),
-    _acPolygonFacesInUseOffset(0),
-    _acPolygonFacesCrudeMutexOffset(0),
+    _acOffsetPolygonFacesInUse(0),
+    _acOffsetPolygonFacesCrudeMutex(0),
+    _atomicCounterCopyBufferId(0),
     _unifLocMaxNodes(0),
     _unifLocMaxPolygonFaces(0)
 {
@@ -33,12 +35,21 @@ ComputeQuadTreeGenerateGeometry::ComputeQuadTreeGenerateGeometry(unsigned int ma
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
     glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint) * 2, 0, GL_DYNAMIC_DRAW);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
+
+    // the atomic counter copy buffer follows suit
+    glGenBuffers(1, &_atomicCounterCopyBufferId);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, _atomicCounterCopyBufferId);
+    glBufferData(GL_COPY_WRITE_BUFFER, sizeof(GLuint), 0, GL_DYNAMIC_COPY);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+
     glUseProgram(0);
 
     // offsets and binding MUST match the offsets specified in the "quad tree generate geometry" shader
-    _acPolygonFacesInUseOffset = 0;
-    _acPolygonFacesCrudeMutexOffset = 4;
+    _acOffsetPolygonFacesInUse = 0;
+    _acOffsetPolygonFacesCrudeMutex = 4;
     glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 4, _atomicCounterBufferId);
+
+    // no binding for the atomic counter copy buffer
 }
 
 // TODO: header
@@ -58,8 +69,10 @@ void ComputeQuadTreeGenerateGeometry::GenerateGeometry()
 
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
 
-    GLuint zeroArr[2] = { 0, 0 };
-    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, 0, sizeof(zeroArr), &zeroArr);
+    GLuint zero = 0;
+    GLuint sizeOfGlUint = sizeof(GLuint);
+    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acOffsetPolygonFacesInUse, sizeOfGlUint, &zero);
+    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acOffsetPolygonFacesCrudeMutex, sizeOfGlUint, &zero);
 
     // calculate the number of work groups and start the magic
     GLuint numWorkGroupsX = (_totalNodes / 256) + 1;
@@ -69,10 +82,23 @@ void ComputeQuadTreeGenerateGeometry::GenerateGeometry()
     glDispatchCompute(numWorkGroupsX, numWorkGroupsY, numWorkGroupsZ);
     glMemoryBarrier(GL_SHADER_STORAGE_BARRIER_BIT | GL_VERTEX_ATTRIB_ARRAY_BARRIER_BIT);
 
+    // retrieve the number of faces currently in use
+    // Note: See ComputeParticleUpdata::Update(...) for more explanation on this.
+    glBindBuffer(GL_COPY_READ_BUFFER, _atomicCounterBufferId);
+    glBindBuffer(GL_COPY_WRITE_BUFFER, _atomicCounterCopyBufferId);
+    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, _acOffsetPolygonFacesInUse, 0, sizeof(GLuint));
+    void *bufferPtr = glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, sizeof(GLuint), GL_MAP_READ_BIT);
+    unsigned int *faceCountPtr = static_cast<unsigned int *>(bufferPtr);
+    _facesInUse = *faceCountPtr;
+    glUnmapBuffer(GL_COPY_WRITE_BUFFER);
 
     // cleanup
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
     glUseProgram(0);
 }
 
-
+// TODO: header
+unsigned int ComputeQuadTreeGenerateGeometry::NumActiveFaces() const
+{
+    return _facesInUse;
+}

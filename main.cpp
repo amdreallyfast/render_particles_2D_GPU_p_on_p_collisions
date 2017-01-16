@@ -42,8 +42,12 @@
 
 // for particles, where they live, and how to update them
 #include "glm/vec2.hpp"
+#include "ParticleQuadTree.h"
 #include "ParticleSsbo.h"
 #include "PolygonSsbo.h"
+#include "QuadTreeNodeSsbo.h"
+#include "ComputeQuadTreeReset.h"
+#include "ComputeQuadTreeGenerateGeometry.h"
 #include "ComputeParticleReset.h"
 #include "ComputeParticleUpdate.h"
 
@@ -63,37 +67,36 @@ FreeTypeEncapsulated gTextAtlases;
 GLint gUnifLocGeometryTransform;
 
 // ??stored in scene??
-ParticleSsbo *gpParticleBuffer;
-PolygonSsbo *gpParticleBoundingRegion;
-PolygonSsbo *gpQuadTree;
+ParticleSsbo *gpParticleBuffer = 0;
+PolygonSsbo *gpParticleBoundingRegionBuffer = 0;
+PolygonSsbo *gpQuadTreeGeometryBuffer = 0;
+QuadTreeNodeSsbo *gpQuadTreeBuffer = 0;
 
 // in a bigger program, ??where would particle stuff be stored??
 IParticleEmitter *gpParticleEmitterBar1 = 0;
 IParticleEmitter *gpParticleEmitterBar2 = 0;
 ComputeParticleReset *gpParticleReseter = 0;
 ComputeParticleUpdate *gpParticleUpdater = 0;
+ComputeQuadTreeReset *gpQuadTreeReseter = 0;
+ComputeQuadTreeGenerateGeometry *gpQuadTreeGeometryGenerator = 0;
 
-// divide between the circle and the polygon regions
-// Note: 
-// - 10,000 particles => ~60 fps on my computer
-// - 15,000 particles => 30-40 fps on my computer
 const unsigned int MAX_PARTICLE_COUNT = 100000;
 
 
-
-/*-----------------------------------------------------------------------------------------------
-Description:
-    Encapsulates the rotating of a 2D vector by -90 degrees (+90 degrees not used in this demo).
-Parameters:
-    v   A const 2D vector.
-Returns:
-    A 2D vector rotated -90 degrees from the provided one.
-Creator:    John Cox (7-2-2016)
------------------------------------------------------------------------------------------------*/
-static glm::vec2 RotateNeg90(const glm::vec2 &v)
-{
-    return glm::vec2(v.y, -(v.x));
-}
+//
+///*-----------------------------------------------------------------------------------------------
+//Description:
+//    Encapsulates the rotating of a 2D vector by -90 degrees (+90 degrees not used in this demo).
+//Parameters:
+//    v   A const 2D vector.
+//Returns:
+//    A 2D vector rotated -90 degrees from the provided one.
+//Creator:    John Cox (7-2-2016)
+//-----------------------------------------------------------------------------------------------*/
+//static glm::vec2 RotateNeg90(const glm::vec2 &v)
+//{
+//    return glm::vec2(v.y, -(v.x));
+//}
 
 /*-----------------------------------------------------------------------------------------------
 Description:
@@ -263,6 +266,13 @@ void Init()
     shaderStorageRef.AddShaderFile(computeQuadTreePopulateKey, "quadTreePopulate.comp", GL_COMPUTE_SHADER);
     shaderStorageRef.LinkShader(computeQuadTreePopulateKey);
 
+    std::string computeQuadTreeGenerateGeometryKey = "compute quad tree generate geometry";
+    shaderStorageRef.NewShader(computeQuadTreeGenerateGeometryKey);
+    shaderStorageRef.AddShaderFile(computeQuadTreeGenerateGeometryKey, "quadTreeGenerateGeometry.comp", GL_COMPUTE_SHADER);
+    shaderStorageRef.LinkShader(computeQuadTreeGenerateGeometryKey);
+
+
+
     // a render shader specifically for the particles (particle color may change depending on 
     // particle state, so it isn't the same as the geometry's render shader)
     std::string renderParticlesShaderKey = "render particles";
@@ -282,18 +292,18 @@ void Init()
     //gUnifLocGeometryTransform = shaderStorageRef.GetUniformLocation(renderGeometryShaderKey, "transformMatrixWindowSpace");
 
     // set up the particle region 
-    glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 45.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-    windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(-0.1f, -0.05f, 0.0f));
-    //glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
-    //windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(0.0f, 0.0f, 0.0f));
+    //glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 45.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+    //windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(-0.1f, -0.05f, 0.0f));
+    glm::mat4 windowSpaceTransform = glm::rotate(glm::mat4(), 0.0f, glm::vec3(0.0f, 0.0f, 1.0f));
+    windowSpaceTransform *= glm::translate(glm::mat4(), glm::vec3(0.0f, 0.0f, 0.0f));
 
     glm::vec4 particleRegionCenter = windowSpaceTransform * glm::vec4(0.0f, 0.0f, 0.0f, 1.0f);
     float particleRegionRadius = 0.8f;
 
-    std::vector<PolygonFace> polygonFaces;
-    GenerateCircle(particleRegionCenter, particleRegionRadius, &polygonFaces);
-    gpParticleBoundingRegion = new PolygonSsbo(polygonFaces);
-    gpParticleBoundingRegion->ConfigureRender(renderGeometryProgramId, GL_LINES);
+    std::vector<PolygonFace> particleRegionPolygonFaces;
+    GenerateCircle(particleRegionCenter, particleRegionRadius, &particleRegionPolygonFaces);
+    gpParticleBoundingRegionBuffer = new PolygonSsbo(particleRegionPolygonFaces);
+    gpParticleBoundingRegionBuffer->ConfigureRender(renderGeometryProgramId, GL_LINES);
 
     // set up the particle SSBO for computing and rendering
     std::vector<Particle> allParticles(MAX_PARTICLE_COUNT);
@@ -301,6 +311,19 @@ void Init()
     gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderResetKey), "ParticleBuffer");
     gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderUpdateKey), "ParticleBuffer");
     gpParticleBuffer->ConfigureRender(shaderStorageRef.GetShaderProgram(renderParticlesShaderKey), GL_POINTS);
+
+    // set up the quad tree for computation
+    ParticleQuadTree quadTree(particleRegionCenter, particleRegionRadius);
+    gpQuadTreeBuffer = new QuadTreeNodeSsbo(quadTree._allQuadTreeNodes);
+    gpQuadTreeBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderQuadTreeResetKey), "QuadTreeNodeBuffer");
+    gpQuadTreeBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeQuadTreeGenerateGeometryKey), "QuadTreeNodeBuffer");
+
+    // set up the quad tree's nodes for rendering
+    unsigned int allPolygonFaces = ParticleQuadTree::_MAX_NODES * 4;
+    std::vector<PolygonFace> quadTreePolygonFaces(allPolygonFaces);
+    gpQuadTreeGeometryBuffer = new PolygonSsbo(quadTreePolygonFaces);
+    gpQuadTreeGeometryBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeQuadTreeGenerateGeometryKey), "QuadTreeFaceBuffer");
+    gpQuadTreeGeometryBuffer->ConfigureRender(renderGeometryProgramId, GL_LINES);
 
     // put the bar emitters across from each and spraying particles toward each other and up so 
     // that the particles collide near the middle with a slight upward velocity
@@ -327,7 +350,10 @@ void Init()
     gpParticleReseter->AddEmitter(gpParticleEmitterBar2);
 
     gpParticleUpdater = new ComputeParticleUpdate(MAX_PARTICLE_COUNT, particleRegionCenter, particleRegionRadius, computeShaderUpdateKey);
-    //gpParticleUpdater->Init(MAX_PARTICLE_COUNT, particleRegionCenter, particleRegionRadius);
+
+    gpQuadTreeReseter = new ComputeQuadTreeReset(ParticleQuadTree::_NUM_STARTING_NODES, ParticleQuadTree::_MAX_NODES, computeShaderQuadTreeResetKey);
+
+    gpQuadTreeGeometryGenerator = new ComputeQuadTreeGenerateGeometry(ParticleQuadTree::_MAX_NODES, allPolygonFaces, computeQuadTreeGenerateGeometryKey);
 
     // the timer will be used for framerate calculations
     gTimer.Init();
@@ -355,6 +381,26 @@ void UpdateAllTheThings()
     // Also Note: 50 easily maxes out the maximuum 100,000 total particles active at one time.
     gpParticleReseter->ResetParticles(20);
     gpParticleUpdater->Update(deltaTimeSec);
+
+    gpQuadTreeReseter->ResetQuadTree();
+    gpQuadTreeGeometryGenerator->GenerateGeometry();
+
+    //GLuint sizeOfQuadTreeNode = sizeof(ParticleQuadTreeNode);
+    //GLuint copyBufferId;
+    //glGenBuffers(1, &copyBufferId);
+    //glBindBuffer(GL_COPY_WRITE_BUFFER, copyBufferId);
+    //glBufferData(GL_COPY_WRITE_BUFFER, sizeOfQuadTreeNode * 5, 0, GL_DYNAMIC_COPY);
+    //glBindBuffer(GL_COPY_READ_BUFFER, gpQuadTreeBuffer->BufferId());
+    //glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, sizeOfQuadTreeNode * 5);
+    //void *bufferPtr = glMapBuffer(GL_COPY_WRITE_BUFFER, GL_READ_ONLY);
+    //ParticleQuadTreeNode *nodePtr = static_cast<ParticleQuadTreeNode *>(bufferPtr);
+    //
+    //glUnmapBuffer(GL_COPY_WRITE_BUFFER);
+    //glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+    //glBindBuffer(GL_COPY_READ_BUFFER, 0);
+    //glDeleteBuffers(1, &copyBufferId);
+
+
 
     // tell glut to call this display() function again on the next iteration of the main loop
     // Note: https://www.opengl.org/discussion_boards/showthread.php/168717-I-dont-understand-what-glutPostRedisplay()-does
@@ -388,44 +434,55 @@ void Display()
     // draw the particle region borders
     glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("render geometry"));
     //glUniformMatrix4fv(gUnifLocGeometryTransform, 1, GL_FALSE, glm::value_ptr(windowSpaceTransform));
-    glBindVertexArray(gpParticleBoundingRegion->VaoId());
-    glDrawArrays(GL_LINES, 0, gpParticleBoundingRegion->NumVertices());
+    GLuint vaoId = gpParticleBoundingRegionBuffer->VaoId();
+    GLenum drawStyle = gpParticleBoundingRegionBuffer->DrawStyle();
+    GLuint numVertices = gpParticleBoundingRegionBuffer->NumVertices();
+    glBindVertexArray(vaoId);
+    glDrawArrays(drawStyle, 0, numVertices);
+
+    // draw the nodes of the quad tree
+    // Note: Keep using the "render geometry" shader.
+    vaoId = gpQuadTreeGeometryBuffer->VaoId();
+    drawStyle = gpQuadTreeGeometryBuffer->DrawStyle();
+    numVertices = gpQuadTreeGeometryGenerator->NumActiveFaces() * 2;
+    glBindVertexArray(vaoId);
+    glDrawArrays(drawStyle, 0, numVertices);
 
     // draw the particles
     glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("render particles"));
     glBindVertexArray(gpParticleBuffer->VaoId());
     glDrawArrays(gpParticleBuffer->DrawStyle(), 0, gpParticleBuffer->NumVertices());
 
-    // draw the frame rate once per second in the lower left corner
-    GLfloat color[4] = { 0.5f, 0.5f, 0.0f, 1.0f };
-    char str[32];
-    static int elapsedFramesPerSecond = 0;
-    static double elapsedTime = 0.0;
-    static double frameRate = 0.0;
-    elapsedFramesPerSecond++;
-    elapsedTime += gTimer.Lap();
-    if (elapsedTime > 1.0)
-    {
-        frameRate = (double)elapsedFramesPerSecond / elapsedTime;
-        elapsedFramesPerSecond = 0;
-        elapsedTime -= 1.0f;
-    }
-    sprintf(str, "%.2lf", frameRate);
+    //// draw the frame rate once per second in the lower left corner
+    //GLfloat color[4] = { 0.5f, 0.5f, 0.0f, 1.0f };
+    //char str[32];
+    //static int elapsedFramesPerSecond = 0;
+    //static double elapsedTime = 0.0;
+    //static double frameRate = 0.0;
+    //elapsedFramesPerSecond++;
+    //elapsedTime += gTimer.Lap();
+    //if (elapsedTime > 1.0)
+    //{
+    //    frameRate = (double)elapsedFramesPerSecond / elapsedTime;
+    //    elapsedFramesPerSecond = 0;
+    //    elapsedTime -= 1.0f;
+    //}
+    //sprintf(str, "%.2lf", frameRate);
 
-    // Note: The font textures' orgin is their lower left corner, so the "lower left" in screen 
-    // space is just above [-1.0f, -1.0f].
-    float xy[2] = { -0.99f, -0.99f };
-    float scaleXY[2] = { 1.0f, 1.0f };
+    //// Note: The font textures' orgin is their lower left corner, so the "lower left" in screen 
+    //// space is just above [-1.0f, -1.0f].
+    //float xy[2] = { -0.99f, -0.99f };
+    //float scaleXY[2] = { 1.0f, 1.0f };
 
-    // the first time that "get shader program" runs, it will load the atlas
-    glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("freetype"));
-    gTextAtlases.GetAtlas(48)->RenderText(str, xy, scaleXY, color);
+    //// the first time that "get shader program" runs, it will load the atlas
+    //glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("freetype"));
+    //gTextAtlases.GetAtlas(48)->RenderText(str, xy, scaleXY, color);
 
-    // now show number of active particles
-    // Note: For some reason, lower case "i" seems to appear too close to the other letters.
-    sprintf(str, "active: %d", gpParticleUpdater->NumActiveParticles());
-    float numActiveParticlesXY[2] = { -0.99f, +0.7f };
-    gTextAtlases.GetAtlas(48)->RenderText(str, numActiveParticlesXY, scaleXY, color);
+    //// now show number of active particles
+    //// Note: For some reason, lower case "i" seems to appear too close to the other letters.
+    //sprintf(str, "active: %d", gpParticleUpdater->NumActiveParticles());
+    //float numActiveParticlesXY[2] = { -0.99f, +0.7f };
+    //gTextAtlases.GetAtlas(48)->RenderText(str, numActiveParticlesXY, scaleXY, color);
 
     // clean up bindings
     glUseProgram(0);
@@ -435,16 +492,16 @@ void Display()
     // tell the GPU to swap out the displayed buffer with the one that was just rendered
     glutSwapBuffers();
 
-    // tell glut to call this display() function again on the next iteration of the main loop
-    // Note: https://www.opengl.org/discussion_boards/showthread.php/168717-I-dont-understand-what-glutPostRedisplay()-does
-    // Also Note: This display() function will also be registered to run if the window is moved
-    // or if the viewport is resized.  If glutPostRedisplay() is not called, then as long as the
-    // window stays put and doesn't resize, display() won't be called again (tested with 
-    // debugging).
-    // Also Also Note: It doesn't matter where this is called in this function.  It sets a flag
-    // for glut's main loop and doesn't actually call the registered display function, but I 
-    // got into the habbit of calling it at the end.
-    glutPostRedisplay();
+    //// tell glut to call this display() function again on the next iteration of the main loop
+    //// Note: https://www.opengl.org/discussion_boards/showthread.php/168717-I-dont-understand-what-glutPostRedisplay()-does
+    //// Also Note: This display() function will also be registered to run if the window is moved
+    //// or if the viewport is resized.  If glutPostRedisplay() is not called, then as long as the
+    //// window stays put and doesn't resize, display() won't be called again (tested with 
+    //// debugging).
+    //// Also Also Note: It doesn't matter where this is called in this function.  It sets a flag
+    //// for glut's main loop and doesn't actually call the registered display function, but I 
+    //// got into the habbit of calling it at the end.
+    //glutPostRedisplay();
 }
 
 /*-----------------------------------------------------------------------------------------------
@@ -536,11 +593,16 @@ Creator:    John Cox (2-13-2016)
 -----------------------------------------------------------------------------------------------*/
 void CleanupAll()
 {
-    // these deletion functions need the buffer ID, but they take a (void *) for the second 
+    delete gpParticleBuffer;
+    delete gpParticleBoundingRegionBuffer;
+    delete gpQuadTreeGeometryBuffer;
+    delete gpQuadTreeBuffer;
     delete gpParticleEmitterBar1;
     delete gpParticleEmitterBar2;
     delete gpParticleReseter;
     delete gpParticleUpdater;
+    delete gpQuadTreeReseter;
+    delete gpQuadTreeGeometryGenerator;
 }
 
 /*-----------------------------------------------------------------------------------------------

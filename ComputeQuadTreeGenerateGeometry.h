@@ -9,16 +9,18 @@ public:
     ~ComputeQuadTreeGenerateGeometry();
 
     void GenerateGeometry();
-
+    unsigned int NumActiveFaces() const;
 
 private:
     unsigned int _computeProgramId;
     unsigned int _totalNodes;
-    unsigned int _totalPolygonFaces;
+    unsigned int _facesInUse;
 
     unsigned int _atomicCounterBufferId;
-    unsigned int _acPolygonFacesInUseOffset;
-    unsigned int _acPolygonFacesCrudeMutexOffset;
+    unsigned int _acOffsetPolygonFacesInUse;
+    unsigned int _acOffsetPolygonFacesCrudeMutex;
+
+    unsigned int _atomicCounterCopyBufferId;
 
     int _unifLocMaxNodes;
     int _unifLocMaxPolygonFaces;

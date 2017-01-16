@@ -14,21 +14,12 @@ struct ParticleQuadTreeNode
     int _indicesForContainedParticles[25];
     int _numCurrentParticles;
 
-    // for optimizing quad tree population with particles
-    // Note: When the quad tree is populated by particles, each possible node will have its own 
-    // thread in the compute shader.  That means that every node must examine every possible 
-    // particle in the particle SSBO.  when it is time for the node to subdivide (this is why 
-    // the compute shader is divided up between the number of nodes and not the number of 
-    // particles), then this value will be set so that the threads for the child nodes don't 
-    // have to start the particle counting all over again.
-    int _startingParticleIndex;
-
     int _inUse;
     int _isSubdivided;
-    int _childNodeIndexTopLeft;
-    int _childNodeIndexTopRight;
-    int _childNodeIndexBottomRight;
-    int _childNodeIndexBottomLeft;
+    uint _childNodeIndexTopLeft;
+    uint _childNodeIndexTopRight;
+    uint _childNodeIndexBottomRight;
+    uint _childNodeIndexBottomLeft;
 
     // left and right edges implicitly X, top and bottom implicitly Y
     float _leftEdge;
@@ -36,14 +27,14 @@ struct ParticleQuadTreeNode
     float _rightEdge;
     float _bottomEdge;
 
-    int _neighborIndexLeft;
-    int _neighborIndexTopLeft;
-    int _neighborIndexTop;
-    int _neighborIndexTopRight;
-    int _neighborIndexRight;
-    int _neighborIndexBottomRight;
-    int _neighborIndexBottom;
-    int _neighborIndexBottomLeft;
+    uint _neighborIndexLeft;
+    uint _neighborIndexTopLeft;
+    uint _neighborIndexTop;
+    uint _neighborIndexTopRight;
+    uint _neighborIndexRight;
+    uint _neighborIndexBottomRight;
+    uint _neighborIndexBottom;
+    uint _neighborIndexBottomLeft;
 };
 
 /*-----------------------------------------------------------------------------------------------
@@ -75,14 +66,6 @@ void main()
     }
 
     // make a copy of the node, update its info, and write it back
-    // Note: Cache coherency demands that all access to a particular piece of memory end up 
-    // with the same piece of data.  If I were only reading from a particular piece of 
-    // memory, then I could get away with not make a copy, but if I'm writing to that 
-    // memory, then any updates to the cached memory must become visible in the SSBO memory, 
-    // and than can slow things down.  This compute shader invocation doesn't care what the 
-    // other quadTreeReset.comp invocations are doing with their nodes.  It only cares about 
-    // this node.  So to avoid the overhead of ltos of memory synchronization due to writes, 
-    // make a copy of this node, update its info, and write to the SSBO once.
     ParticleQuadTreeNode node = AllQuadTreeNodes[index];
 
     // don't bother resetting the particle indices to 0 because they'll be run over the next 
@@ -91,12 +74,13 @@ void main()
 
     // no subdivision by default
     node._isSubdivided = 0;
+
     node._childNodeIndexTopLeft = -1;
     node._childNodeIndexTopRight = -1;
     node._childNodeIndexBottomRight = -1;
     node._childNodeIndexBottomLeft = -1;
 
-    if (index < uNumStartingNodes)
+    if (index >= uNumStartingNodes)
     {
         node._inUse = 0;
     }

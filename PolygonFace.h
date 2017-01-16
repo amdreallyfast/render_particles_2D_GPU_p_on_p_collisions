@@ -12,6 +12,21 @@ struct PolygonFace
 {
     /*-------------------------------------------------------------------------------------------
     Description:
+        Gives members default values.  This default constructor was created so that a 
+        std::vector<...> of them could be created with null values and then shoved into an SSBO 
+        for alteration in a compute shader.
+    Parameters: None
+    Returns:    None
+    Creator: John Cox, 1-16-2017
+    -------------------------------------------------------------------------------------------*/
+    PolygonFace() :
+        _start(glm::vec2(), glm::vec2()),
+        _end(glm::vec2(), glm::vec2())
+    {
+    }
+
+    /*-------------------------------------------------------------------------------------------
+    Description:
         Gives members initial values to describe the face of a 2D polygon face.  Without the 
         normals, this would just be a 2D line, but with surface normals the line is technically 
         considered a face.

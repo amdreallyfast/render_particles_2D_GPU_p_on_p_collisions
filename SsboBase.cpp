@@ -2,6 +2,15 @@
 
 #include "glload/include/glload/gl_4_4.h"
 
+// TODO: header
+static unsigned int GetNewStorageBlockBindingPointIndex()
+{
+    static GLuint ssboBindingPointIndex = 0;
+
+    return ssboBindingPointIndex++;
+}
+
+
 /*-----------------------------------------------------------------------------------------------
 Description:
     Gives members default values.
@@ -22,7 +31,8 @@ SsboBase::SsboBase() :
     _vaoId(0),
     _bufferId(0),
     _drawStyle(0),
-    _numVertices(0)
+    _numVertices(0),
+    _ssboBindingPointIndex(GetNewStorageBlockBindingPointIndex())
 {
     glGenBuffers(1, &_bufferId);
     glGenVertexArrays(1, &_vaoId);
@@ -94,4 +104,25 @@ unsigned int SsboBase::NumVertices() const
 {
     return _numVertices;
 }
+
+///*-----------------------------------------------------------------------------------------------
+//Description:
+//    At this point in my demos, I have three SSBO structures: particle, polygon face, and quad tree node.  The polygon face SSBO may end up being used more than once, so there is at least 3, possibly more, SSBOs that need unique binding points.  
+//    
+//    
+//    I can't do a simple increment though, because the SSBO needs to keep its binding point index across 
+//    
+//
+//
+//Parameters: None
+//Returns:
+//    See description.
+//Creator: John Cox, 9-20-2016
+//-----------------------------------------------------------------------------------------------*/
+//unsigned int SsboBase::GetStorageBlockBindingPointIndexForBuffer(const std::string &bufferNameInShader)
+//{
+//    static GLuint ssboBindingPointIndex = 0;
+//
+//    return ssboBindingPointIndex++;
+//}
 

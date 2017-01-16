@@ -1,22 +1,25 @@
 #pragma once
 
 #include "SsboBase.h"
-#include "PolygonFace.h"
+#include "ParticleQuadTreeNode.h"
 #include <vector>
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    Sets up the Shader Storage Block Object for a 2D polygon.  The polygon will be used in both 
-    the compute shader and in the geometry render shader.
-Creator: John Cox, 9-8-2016
+    Sets up the Shader Storage Block Object for quad tree nodes.  The polygon will be used in 
+    the compute shader only.
+Creator: John Cox, 1/16/2017
 -----------------------------------------------------------------------------------------------*/
-class PolygonSsbo : public SsboBase
+class QuadTreeNodeSsbo : public SsboBase
 {
 public:
-    PolygonSsbo(const std::vector<PolygonFace> &faceCollection);
-    virtual ~PolygonSsbo();
+    QuadTreeNodeSsbo(const std::vector<ParticleQuadTreeNode> &nodeCollection);
+    virtual ~QuadTreeNodeSsbo();
 
     void ConfigureCompute(unsigned int computeProgramId, const std::string &bufferNameInShader) override;
     void ConfigureRender(unsigned int renderProgramId, unsigned int drawStyle) override;
+
+private:
+    unsigned int _bufferSizeBytes;
 };
 

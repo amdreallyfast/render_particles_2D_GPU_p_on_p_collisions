@@ -161,6 +161,7 @@
     <ClCompile Include="ParticleQuadTree.cpp" />
     <ClCompile Include="ParticleSsbo.cpp" />
     <ClCompile Include="PolygonSsbo.cpp" />
+    <ClCompile Include="QuadTreeNodeSsbo.cpp" />
     <ClCompile Include="RandomToast.cpp" />
     <ClCompile Include="ShaderStorage.cpp" />
     <ClCompile Include="SsboBase.cpp" />
@@ -194,6 +195,7 @@
     <ClInclude Include="ParticleQuadTree.h" />
     <ClInclude Include="ParticleQuadTreeNode.h" />
     <ClInclude Include="PolygonSsbo.h" />
+    <ClInclude Include="QuadTreeNodeSsbo.h" />
     <ClInclude Include="SsboBase.h" />
     <ClInclude Include="IParticleEmitter.h" />
     <ClInclude Include="MinMaxVelocity.h" />

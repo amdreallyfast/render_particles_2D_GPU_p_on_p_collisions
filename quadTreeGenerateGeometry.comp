@@ -91,32 +91,65 @@ layout (std430) buffer QuadTreeFaceBuffer
 };
 
 
+// TODO: header
+// Note: Suppose 30, 50, or 100 or more invocations of this shader find that the mutex counter is 0 at the same time.  Then they all increment the mutex counter, but since it is an atomic operation, only one of them will increment from 0 to 1.  That shader will break out of the loop and continue.  All the other shaders will immediately decrement the mutex, returning it to 1.  They will then wait for the counter to be 0 agin.  When the one shader that got the mutex is done, it needs to call ReleaseMutexForPolygonFace() to decrement the counter and return it to 0;
+void AquireMutexForPolygonFace()
+{
+    while (true)
+    {
+        // wait for mutex to be available
+        while (atomicCounter(acPolygonFacesCrudeMutex) != 0);
+
+        // attempt to grab the mutex
+        uint counterVal = atomicCounterIncrement(acPolygonFacesCrudeMutex);
+        if (counterVal == 1)
+        {
+            // break out of the loop
+            break;
+        }
+        else
+        {
+            // didn't get it, so back to the waiting game
+            atomicCounterDecrement(acPolygonFacesCrudeMutex);
+        }
+    }
+}
+
+// TODO: header
+void ReleaseMutexForPolygonFace()
+{
+    atomicCounterDecrement(acPolygonFacesCrudeMutex);
+}
 
 // TODO: header
 bool GenerateFacesForNode(uint nodeIndex)
 {
-    // acquire the crude mutex
-    while (atomicCounterIncrement(acPolygonFacesCrudeMutex) > 1)
-    {
-        atomicCounterDecrement(acPolygonFacesCrudeMutex);
-    }
+    //while (atomicCounter(acPolygonFacesCrudeMutex) == 0)
+    //{
+    //    if (1 != 5)
+    //    {
+    //        break;
+    //    }
+    //}
 
-    // return immediately if there are not enough faces
-    if (atomicCounter(acPolygonFacesInUse) > (uMaxPolygonFaces - 4))
-    {
-        // not enough nodes to subdivide again, so release the cude mutex on node subdivision
-        atomicCounterDecrement(acPolygonFacesCrudeMutex);
-        return false;
-    }
+    //AquireMutexForPolygonFace();
+
+    //// return immediately if there are not enough faces
+    //if (atomicCounter(acPolygonFacesInUse) > (uMaxPolygonFaces - 4))
+    //{
+    //    // not enough faces
+    //    //ReleaseMutexForPolygonFace();
+    //    return false;
+    //}
+
+    // there are enough faces for 4 new indices to not overrun the buffer
+    //ReleaseMutexForPolygonFace();
 
     // acquire 4 new faces
     uint face1Index = atomicCounterIncrement(acPolygonFacesInUse);
     uint face2Index = atomicCounterIncrement(acPolygonFacesInUse);
     uint face3Index = atomicCounterIncrement(acPolygonFacesInUse);
     uint face4Index = atomicCounterIncrement(acPolygonFacesInUse);
-
-    // release the crude mutex
-    atomicCounterDecrement(acPolygonFacesCrudeMutex);
 
     // this node has been accessed enough by this time that it's probably in the cache, so don't 
     // make a copy of the whole node and instead just look up the edges 
@@ -142,6 +175,16 @@ bool GenerateFacesForNode(uint nodeIndex)
     // face 1 is across the top 
     face1Copy._start._pos = topLeft;
     face1Copy._end._pos = topRight;
+//    if (AllNodes[0]._leftEdge <= -0.8f)
+//    {
+//        face1Copy._start._pos = vec4(-0.8f, +0.8f, 0, 1);
+//    }
+//    else
+//    {
+//        face1Copy._start._pos = vec4(-0.5f, -0.2f, 0, 1);
+//    }
+    
+//    face1Copy._end._pos = vec4(+0.5f, -0.2f, 0, 1);
 
     // face 2 is across the right 
     face2Copy._start._pos = topRight;
@@ -180,12 +223,11 @@ void main()
         return;
     }
 
-    if (AllNodes[index]._isActive == 0)
+    if (AllNodes[index]._inUse == 0)
     {
         return;
     }
 
     GenerateFacesForNode(index);
-
 }
 
