@@ -128,6 +128,10 @@ bool ComputeParticleReset::AddEmitter(const IParticleEmitter *pEmitter)
 
 /*-----------------------------------------------------------------------------------------------
 Description:
+    Resets the atomic counters and dispatches the shader.
+
+    The number of work groups is based on the maximum number of particles.
+
     All the particle emitters reset particles to that emitter's location (up to a limit).
 
     Particles are spread out evenly between all the emitters (or at least as best as possible; 

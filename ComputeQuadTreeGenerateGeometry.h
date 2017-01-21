@@ -2,6 +2,18 @@
 
 #include <string>
 
+
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Encapsulates quad tree resetting via compute shader:
+
+    For each node:
+    - number current particles = 0
+    - "is subdivided" = 0
+    - child node indices set to -1 (max unsigned int)
+    - if the node is not one of the starting nodes, "in use" = 0
+Creator:    John Cox (1-16-2017)
+-----------------------------------------------------------------------------------------------*/
 class ComputeQuadTreeGenerateGeometry
 {
 public:

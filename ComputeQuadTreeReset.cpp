@@ -4,8 +4,20 @@
 #include "ShaderStorage.h"
 
 
-// TODO: header
-ComputeQuadTreeReset::ComputeQuadTreeReset(unsigned int numStartingNodes, unsigned int maxNodes, const std::string computeShaderKey)
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Gives members initial values.
+    Finds the uniforms for the "generate geometry" compute shader and gives them initial values.
+Parameters:
+    numStartingNodes    If a node was not in the group that was calculated on initialization, it 
+        is disabled.
+    maxNodes            Tells the shader how big the "quad tree node" buffer is.
+    computeShaderKey    Used to look up the shader's uniform and program ID.
+Returns:    None
+Creator:    John Cox (1-16-2017)
+-----------------------------------------------------------------------------------------------*/
+ComputeQuadTreeReset::ComputeQuadTreeReset(unsigned int numStartingNodes, unsigned int maxNodes, 
+    const std::string &computeShaderKey)
 {
     _totalNodeCount = maxNodes;
     ShaderStorage &shaderStorageRef = ShaderStorage::GetInstance();
@@ -22,8 +34,15 @@ ComputeQuadTreeReset::ComputeQuadTreeReset(unsigned int numStartingNodes, unsign
     glUseProgram(0);
 }
 
-// TODO: header
-// doesn't do a whole lot
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Dispatches the shader.
+
+    The number of work groups is calculated according to the maximum number of nodes.
+Parameters: None
+Returns:    None
+Creator:    John Cox (1-16-2017)
+-----------------------------------------------------------------------------------------------*/
 void ComputeQuadTreeReset::ResetQuadTree()
 {
     GLuint numWorkGroupsX = (_totalNodeCount / 256) + 1;

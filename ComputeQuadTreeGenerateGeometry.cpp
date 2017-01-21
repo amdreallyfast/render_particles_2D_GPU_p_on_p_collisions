@@ -3,8 +3,20 @@
 #include "glload/include/glload/gl_4_4.h"
 #include "ShaderStorage.h"
 
-// TODO: header
-ComputeQuadTreeGenerateGeometry::ComputeQuadTreeGenerateGeometry(unsigned int maxNodes, unsigned int maxPolygonFaces, const std::string &computeShaderKey) :
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Gives members initial values.
+    Finds the uniforms for the "generate geometry" compute shader and gives them initial values.
+    Generates the atomic counters for this shader.  Values are set in GenerateGeometry().
+Parameters:
+    maxNodes            Tells the shader how big the "quad tree node" buffer is.
+    maxPolygonFaces     Tells the shader how many polygon faces are available.
+    computeShaderKey    Used to look up the shader's uniform and program ID.
+Returns:    None
+Creator:    John Cox (1-16-2017)
+-----------------------------------------------------------------------------------------------*/
+ComputeQuadTreeGenerateGeometry::ComputeQuadTreeGenerateGeometry(unsigned int maxNodes, 
+    unsigned int maxPolygonFaces, const std::string &computeShaderKey) :
     _computeProgramId(0),
     _totalNodes(0),
     _facesInUse(0),
@@ -44,7 +56,7 @@ ComputeQuadTreeGenerateGeometry::ComputeQuadTreeGenerateGeometry(unsigned int ma
 
     glUseProgram(0);
 
-    // offsets and binding MUST match the offsets specified in the "quad tree generate geometry" shader
+    // offsets and binding MUST match the offsets specified in the "generate geometry" shader
     _acOffsetPolygonFacesInUse = 0;
     _acOffsetPolygonFacesCrudeMutex = 4;
     glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 4, _atomicCounterBufferId);
@@ -52,20 +64,34 @@ ComputeQuadTreeGenerateGeometry::ComputeQuadTreeGenerateGeometry(unsigned int ma
     // no binding for the atomic counter copy buffer
 }
 
-// TODO: header
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Deletes the buffer for the atomic counters.
+Parameters: None
+Returns:    None
+Creator:    John Cox (1-16-2017)
+-----------------------------------------------------------------------------------------------*/
 ComputeQuadTreeGenerateGeometry::~ComputeQuadTreeGenerateGeometry()
 {
     glDeleteBuffers(1, &_atomicCounterBufferId);
 }
 
-// TODO: header
-// resets the atomic counters and dispatches the compute shader
+/*-----------------------------------------------------------------------------------------------
+Description:
+    Resets the atomic counters nd dispatches the shader.
+
+    The number of work groups is based on the maximum number of nodes.
+Parameters: None
+Returns:    None
+Creator:    John Cox (1-16-2017)
+-----------------------------------------------------------------------------------------------*/
 void ComputeQuadTreeGenerateGeometry::GenerateGeometry()
 {
     glUseProgram(_computeProgramId);
 
     // both atomic counters are 0
-    // Note: This shader will run through all the nodes and generate new faces for every single one, so the initial faces in use is 0.  The crude mutex should be available by default, so it is also 0.
+    // Note: This shader will run through all the nodes and generate new faces for every single 
+    // one, so the initial number of faces in use is 0.  
 
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
 
@@ -97,7 +123,15 @@ void ComputeQuadTreeGenerateGeometry::GenerateGeometry()
     glUseProgram(0);
 }
 
-// TODO: header
+/*-----------------------------------------------------------------------------------------------
+Description:
+    A simple getter for the number of polygon faces that were in use after the last call to 
+    GenerateGeometry().
+Parameters: None
+Returns:    
+    See Description.
+Creator:    John Cox (1-16-2017)
+-----------------------------------------------------------------------------------------------*/
 unsigned int ComputeQuadTreeGenerateGeometry::NumActiveFaces() const
 {
     return _facesInUse;

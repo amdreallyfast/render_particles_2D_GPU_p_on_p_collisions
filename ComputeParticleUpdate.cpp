@@ -98,9 +98,9 @@ ComputeParticleUpdate::~ComputeParticleUpdate()
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    Examines all active particles and:
-    (1) updates their position based on velocity and delta time
-    (2) checks if they have gone outside the polygon bounds, and if so, deactives them
+    Resets the atomic counter and dispatches the shader.
+    
+    The number of work groups is based on the maximum number of particles.
 Parameters:    
     deltaTimeSec    Self-explanatory
 Returns:    None
