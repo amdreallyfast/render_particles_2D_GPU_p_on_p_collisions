@@ -104,8 +104,8 @@ void AquireMutexForPolygonFace()
         uint counterVal = atomicCounterIncrement(acPolygonFacesCrudeMutex);
         if (counterVal == 1)
         {
-            // break out of the loop
-            break;
+            // got it
+            return;
         }
         else
         {
@@ -124,26 +124,18 @@ void ReleaseMutexForPolygonFace()
 // TODO: header
 bool GenerateFacesForNode(uint nodeIndex)
 {
-    //while (atomicCounter(acPolygonFacesCrudeMutex) == 0)
-    //{
-    //    if (1 != 5)
-    //    {
-    //        break;
-    //    }
-    //}
+//    AquireMutexForPolygonFace();
 
-    //AquireMutexForPolygonFace();
-
-    //// return immediately if there are not enough faces
-    //if (atomicCounter(acPolygonFacesInUse) > (uMaxPolygonFaces - 4))
-    //{
-    //    // not enough faces
-    //    //ReleaseMutexForPolygonFace();
-    //    return false;
-    //}
+//    // return immediately if there are not enough faces
+//    if (atomicCounter(acPolygonFacesInUse) > (uMaxPolygonFaces - 4))
+//    {
+//        // not enough faces
+//        //ReleaseMutexForPolygonFace();
+//        return false;
+//    }
 
     // there are enough faces for 4 new indices to not overrun the buffer
-    //ReleaseMutexForPolygonFace();
+//    ReleaseMutexForPolygonFace();
 
     // acquire 4 new faces
     uint face1Index = atomicCounterIncrement(acPolygonFacesInUse);
@@ -227,6 +219,8 @@ void main()
     {
         return;
     }
+
+
 
     GenerateFacesForNode(index);
 }
