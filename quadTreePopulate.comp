@@ -2,10 +2,6 @@
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 layout (binding = 3, offset = 0) uniform atomic_uint acNodesInUse;
-layout (binding = 3, offset = 4) uniform atomic_uint acNodeSubdivisionCrudeMutex;
-
-// MUST match or exceed the max number of quad tree nodes in ParticleQuadTree.h
-layout (binding = 3, offset = 8) uniform atomic_uint acNodeAccessCrudeMutexes[512];
 
 
 /*-----------------------------------------------------------------------------------------------
@@ -101,31 +97,13 @@ Exception:  Safe
 Creator:    John Cox (1-12-2017) (adapted from CPU version, 12-17-2016)
 -----------------------------------------------------------------------------------------------*/
 bool SubdivideNode(uint nodeIndex)
-{
-    // restrict access to generating new nodes in order to make sure that the max node count is not exceeded
-    while (atomicCounterIncrement(acNodeSubdivisionCrudeMutex) > 1)
-    {
-        atomicCounterDecrement(acNodeSubdivisionCrudeMutex);
-    }
-
-    // return immediately if there are not enough nodes for subdivision
-    // Note: Each subdivision needs 4 more children.  Suppose there is a maximum of 128 nodes, and currently 124 are in use.  In that case, this condition would be false.  But if, for some reason, there is a maximum of 127 nodes, and again 124 are in use, then this condition would fail and the node would not subdivide.
-    if (atomicCounter(acNodesInUse) > (uMaxNodes - 4))
-    {
-        // not enough nodes to subdivide again, so release the cude mutex on node subdivision
-        atomicCounterDecrement(acNodeSubdivisionCrudeMutex);
-        return false;
-    }
-    
+{    
     // generate 4 more children
     // Note: Atomic counter incrementing is like an index++ operation.  That is, it returns the current value, THEN increments it, so it is safe to use the return value of an increment on the "nodes in use" atomic counter as a 0-based index.  https://www.khronos.org/opengl/wiki/Atomic_Counter#Operations.
     uint childNodeIndexTopLeft = atomicCounterIncrement(acNodesInUse);
     uint childNodeIndexTopRight = atomicCounterIncrement(acNodesInUse);
     uint childNodeIndexBottomRight = atomicCounterIncrement(acNodesInUse);
     uint childNodeIndexBottomLeft = atomicCounterIncrement(acNodesInUse);
-
-    // release the cude mutex on node subdivision
-    atomicCounterDecrement(acNodeSubdivisionCrudeMutex);
 
     // make a copy of the node and its new children, modify them, and write them back at the end
     // Note: A lot of the members of the ParticleQuadTreeNode need to be accessed.  It will be easier for typing, and possibly more cache friendly, to make a local copy of the nodes that are being read from or written to than to always be accessing the SSBO for every member of every node.
@@ -283,15 +261,6 @@ Creator:    John Cox (1-12-2017) (adapted from CPU version, 12-17-2016)
 -----------------------------------------------------------------------------------------------*/
 uint AddParticleToNode(uint particleIndex, uint nodeIndex)
 {
-    // this crude mutex is necessary to prevent multiple particles from adding themselves to this node at the same time, especially while the node is subdividing
-    while (atomicCounterIncrement(acNodeAccessCrudeMutexes[nodeIndex]) > 1)
-    {
-        // another particle got to it first
-        atomicCounterDecrement(acNodeAccessCrudeMutexes[nodeIndex]);
-    }
-
-    // the atomic counter incremented from 0 to 1, so we have exclusive access to this node
-
     uint destinationNodeIndex = 0;
     uint allDone = 0xffffffff;
     
@@ -360,9 +329,6 @@ uint AddParticleToNode(uint particleIndex, uint nodeIndex)
         }
     }
 
-    // release the hold on this node
-    atomicCounterDecrement(acNodeAccessCrudeMutexes[nodeIndex]);
-
     // this node is subdivided and the particle needs to be added to its children, so this function needs to be called again
     return destinationNodeIndex;
 }
@@ -384,59 +350,101 @@ uniform float uInverseXIncrementPerColumn;
 uniform float uInverseYIncrementPerRow;
 void main()
 {
-    uint particleIndex = gl_GlobalInvocationID.x;
-    if (particleIndex >= uMaxParticles)
+    uint nodeIndex = gl_GlobalInvocationID.x;
+    if (nodeIndex >= uMaxNodes)
     {
         return;
     }
 
-    if (AllParticles[particleIndex]._isActive == 0)
+    ParticleQuadTreeNode node = AllNodes[nodeIndex];
+
+    if (node._inUse == 0)
     {
-        // only add active particles
         return;
     }
+//
+//    node._numCurrentParticles++;
 
-    // I can't think of an intuitive explanation for why the following math works, but it does (I worked it out by hand, got it wrong, experimented, and got it right)
-    // Note: Row bounds are on the Y axis, column bounds are on the X axis.  I always get them mixed up because a row is horizontal (like X) and a column is vertical (like Y).
-    // Also Node:
-    //  col index   = (int)((particle.pos.x - quadTreeLeftEdge) / xIncrementPerColumn);
-    //  row index   = (int)((quadTreeTopEdge - particle.pos.y) / yIncrementPerRow);
-    // 
-    //  Let c = particle region center
-    //  Let r = particle region radius
-    //  Let p = particle
-    //  Then:
-    //  col index = (int)((p.pos.x - (c.x - r)) / xIncrementPerColumn);
-    //  row index = (int)(((c.y + r) - p.pos.y) / yIncrementPerRow);
-    //
-    // Also Also Note: The integer rounding should NOT be rounded to the nearest integer.  Array indices start at 0, so any value between 0 and 1 is considered to be in the 0th index.
-
-    vec4 particlePos = AllParticles[particleIndex]._pos;
-
-    // column
-    float leftEdge = uParticleRegionCenter.x - uParticleRegionRadius;
-    float xDiff = particlePos.x - leftEdge;
-    float colFloat = xDiff * uInverseXIncrementPerColumn;
-    uint colInteger = uint(floor(colFloat));
-
-    // row
-    float topEdge = uParticleRegionCenter.y + uParticleRegionRadius;
-    float yDiff = topEdge - particlePos.y;
-    float rowFloat = yDiff * uInverseYIncrementPerRow;
-    uint rowInteger = uint(floor(rowFloat));
-
-    // same index calculation as the tree initialization 
-    // Note: The initially calculated node may belong to a subdivided node.  The index of the actual node that the particle is added to may be different, hence the "initial".
-    uint initialNodeIndex = (rowInteger * uNumColumnsInTreeInitial) + colInteger;
-
-    // recursively navigate the quad tree and add the particle
-    // Note: GLSL does not allow recursion.  This loop is the best I could come up with.
-    // Also Node: Using 0xffffffff as an "end of recursion" value because the node index needs to work with atomic counters, which can only be uint.  I'd rather not rely on an implicit -1 -> max unsigned int conversion, so I will spell out max 32bit int.
-    uint anotherNodeIndex = AddParticleToNode(particleIndex, initialNodeIndex);
-    while (anotherNodeIndex != 0xffffffff)
+    for (uint particleIndex = 0; particleIndex < uMaxParticles; particleIndex++)
     {
-        anotherNodeIndex = AddParticleToNode(particleIndex, anotherNodeIndex);
+        Particle p = AllParticles[particleIndex];
+        bool particleIsActive = (p._isActive == 1);
+        bool withinXBounds = p._pos.x > node._leftEdge && p._pos.x < node._rightEdge;
+        bool withinYBounds = p._pos.y > node._bottomEdge && p._pos.y < node._topEdge;
+
+//        if (particleIsActive && withinXBounds && withinYBounds)
+//        {
+//            node._numCurrentParticles++;
+//        }
+
+        uint oldParticleCount = node._numCurrentParticles;
+        uint newParticleCount = node._numCurrentParticles + 1;
+
+        node._numCurrentParticles = (particleIsActive && withinXBounds && withinYBounds) ? newParticleCount : oldParticleCount;
+
+
+//        // avoid branch condition of an "if (...)" statement just for a ++
+//        Particle p = AllParticles[particleIndex];
+//        bool particleIsActive = (p._isActive == 1);
+//        bool withinXBounds = p._pos.x > node._leftEdge && p._pos.x < node._rightEdge;
+//        bool withinYBounds = p._pos.y > node._bottomEdge && p._pos.y < node._topEdge;
+//
+//        //bool particleIsInNode = particleIsActive && withinXBounds && withinYBounds;
+//        bool particleIsInNode = (p._pos.x == 0);
+//        uint oldParticleCount = node._numCurrentParticles;
+//        uint newParticleCount = node._numCurrentParticles + 1;
+//
+//        // Note: Trinary operators are not an option for choosing branching paths of logic, but they are very useful for selecting one of two values.  The best part about them, especially /from /the perspective of one of the GPU's cores, is that they don't translate to branching logic, which screws up the instruction pipeline.  Full-fledged CPUs aren't as affected by branching/ /logic, but a shader can benefit immensely from it.  I did this same particle counting logic with "if (!particleIsActive) continue" and "if (particleWithinBounds) numCurrentParticles+/+" /branches and the framerate was bogged down to ~20fps.  I switched to trinary operators for the same result, and the frame rate shot back up to ~60fps.  Very nice.
+//        //node._numCurrentParticles = particleIsInNode ? newParticleCount : oldParticleCount;
+//        node._numCurrentParticles = particleIsInNode ? 18 : 57;
     }
+    
+    // write it back
+    AllNodes[nodeIndex] = node;
+
+
+
+//    // I can't think of an intuitive explanation for why the following math works, but it does (I worked it out by hand, got it wrong, experimented, and got it right)
+//    // Note: Row bounds are on the Y axis, column bounds are on the X axis.  I always get them mixed up because a row is horizontal (like X) and a column is vertical (like Y).
+//    // Also Node:
+//    //  col index   = (int)((particle.pos.x - quadTreeLeftEdge) / xIncrementPerColumn);
+//    //  row index   = (int)((quadTreeTopEdge - particle.pos.y) / yIncrementPerRow);
+//    // 
+//    //  Let c = particle region center
+//    //  Let r = particle region radius
+//    //  Let p = particle
+//    //  Then:
+//    //  col index = (int)((p.pos.x - (c.x - r)) / xIncrementPerColumn);
+//    //  row index = (int)(((c.y + r) - p.pos.y) / yIncrementPerRow);
+//    //
+//    // Also Also Note: The integer rounding should NOT be rounded to the nearest integer.  Array indices start at 0, so any value between 0 and 1 is considered to be in the 0th index.
+//
+//    vec4 particlePos = AllParticles[particleIndex]._pos;
+//
+//    // column
+//    float leftEdge = uParticleRegionCenter.x - uParticleRegionRadius;
+//    float xDiff = particlePos.x - leftEdge;
+//    float colFloat = xDiff * uInverseXIncrementPerColumn;
+//    uint colInteger = uint(floor(colFloat));
+//
+//    // row
+//    float topEdge = uParticleRegionCenter.y + uParticleRegionRadius;
+//    float yDiff = topEdge - particlePos.y;
+//    float rowFloat = yDiff * uInverseYIncrementPerRow;
+//    uint rowInteger = uint(floor(rowFloat));
+//
+//    // same index calculation as the tree initialization 
+//    // Note: The initially calculated node may belong to a subdivided node.  The index of the actual node that the particle is added to may be different, hence the "initial".
+//    uint initialNodeIndex = (rowInteger * uNumColumnsInTreeInitial) + colInteger;
+//
+//    // recursively navigate the quad tree and add the particle
+//    // Note: GLSL does not allow recursion.  This loop is the best I could come up with.
+//    // Also Node: Using 0xffffffff as an "end of recursion" value because the node index needs to work with atomic counters, which can only be uint.  I'd rather not rely on an implicit -1 -> /max/ unsigned int conversion, so I will spell out max 32bit int.
+//    uint anotherNodeIndex = AddParticleToNode(particleIndex, initialNodeIndex);
+//    while (anotherNodeIndex != 0xffffffff)
+//    {
+//        anotherNodeIndex = AddParticleToNode(particleIndex, anotherNodeIndex);
+//    }
 
     // done; particle has been added
 }

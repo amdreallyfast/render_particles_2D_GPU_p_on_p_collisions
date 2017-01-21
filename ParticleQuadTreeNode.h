@@ -2,8 +2,6 @@
 
 #include <memory>
 
-const unsigned int MAX_PARTICLES_PER_QUAD_TREE_NODE = 25;
-
 /*-----------------------------------------------------------------------------------------------
 Description:
     Contains all info necessary for a single node of the quad tree.  It is a dumb container 
@@ -35,6 +33,8 @@ struct ParticleQuadTreeNode
     {
         memset(_indicesForContainedParticles, 0, sizeof(int) * MAX_PARTICLES_PER_QUAD_TREE_NODE);
     }
+
+    static const unsigned int MAX_PARTICLES_PER_QUAD_TREE_NODE = 25;
 
     unsigned int _indicesForContainedParticles[MAX_PARTICLES_PER_QUAD_TREE_NODE];
     unsigned int _numCurrentParticles;

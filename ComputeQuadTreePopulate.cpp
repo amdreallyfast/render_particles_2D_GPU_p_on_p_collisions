@@ -108,6 +108,8 @@ ComputeQuadTreePopulate::~ComputeQuadTreePopulate()
     glDeleteBuffers(1, &_atomicCounterBufferId);
 }
 
+#include "ParticleQuadTreeNode.h"
+
 // TODO: header
 void ComputeQuadTreePopulate::PopulateTree()
 {
@@ -120,19 +122,20 @@ void ComputeQuadTreePopulate::PopulateTree()
     // "nodes in use" is the number of nodes used in the tree's initial subdivision
     glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodesInUseOffset, sizeOfOneAtomicCounter, &_initialNodes);
 
-    // the mutexes all initialize to 0
-    GLuint nada = 0;
-    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodeSubdivisionCrudeMutexOffset, sizeOfOneAtomicCounter, &nada);
+    //// the mutexes all initialize to 0
+    //GLuint nada = 0;
+    //glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodeSubdivisionCrudeMutexOffset, sizeOfOneAtomicCounter, &nada);
 
-    std::vector<GLuint> allZeros(_totalNodes, 0);
-    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodeAccessCrudeMutexsOffset, sizeOfOneAtomicCounter * _totalNodes, allZeros.data());
+    //std::vector<GLuint> allZeros(_totalNodes, 0);
+    //glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodeAccessCrudeMutexsOffset, sizeOfOneAtomicCounter * _totalNodes, allZeros.data());
 
     // cleanup
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 
 
     // calculate the number of work groups and start the magic
-    GLuint numWorkGroupsX = (_totalParticles / 256) + 1;
+    //GLuint numWorkGroupsX = (_totalParticles / 256) + 1;
+    GLuint numWorkGroupsX = (_totalNodes / 256) + 1;
     GLuint numWorkGroupsY = 1;
     GLuint numWorkGroupsZ = 1;
     glUseProgram(_computeProgramId);

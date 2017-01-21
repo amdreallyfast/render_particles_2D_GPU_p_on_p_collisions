@@ -21,9 +21,10 @@ ParticleQuadTree::ParticleQuadTree(const glm::vec4 &particleRegionCenter, float 
     _particleRegionCenter = particleRegionCenter;
     _particleRegionRadius = particleRegionRadius;
 
-    // starting in the upper left corner of the 2D particle region, where X is minimal and Y is 
-    // maximal because OpenGL's rectangle origins are the bottom left corner, unlike most 
-    // rectangles in graphical programming, where the top left is min x and min y
+    // starting at the origin (upper left corner of the 2D particle region)
+    // Note: Unlike most rectangles in graphical programming, OpenGL's begin at the lower left.  
+    // Beginning at the upper left, as this algorithm does, means that X and Y are not (0,0), 
+    // but X and Y are (0, max).
     float xBegin = particleRegionCenter.x - particleRegionRadius;
     float yBegin = particleRegionCenter.y + particleRegionRadius;
 
