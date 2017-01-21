@@ -21,10 +21,11 @@ struct Particle
 {
     vec4 _pos;
     vec4 _vel;
-    vec4 _netForce;
+    vec4 _netForceThisFrame;
     int _collisionCountThisFrame;
     float _mass;
     float _radiusOfInfluence;
+    unsigned int _indexOfNodeThatItIsOccupying;
     int _isActive;
 };
 

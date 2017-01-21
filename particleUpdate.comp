@@ -18,44 +18,13 @@ struct Particle
 {
     vec4 _pos;
     vec4 _vel;
-    vec4 _netForce;
+    vec4 _netForceThisFrame;
     int _collisionCountThisFrame;
     float _mass;
     float _radiusOfInfluence;
+    unsigned int _indexOfNodeThatItIsOccupying;
     int _isActive;
 };
-
-///*-----------------------------------------------------------------------------------------------
-//Description:
-//    OpenGL rendering uses the same "Polygon Face" buffer, and OpenGL rendering takes vertices 
-//    one at a time.  I originally tried making each face into a single structure with two 
-//    positions and one normal, but then the rendering treated the whole thing like a single 
-//    vertex.  Whoops.  So I have to specify each vertex individually for the sake of rendering 
-//    and then match that here in the compute shader.
-//    
-//    Must match the version on the CPU side.
-//Creator: John Cox (9-25-2016)
-//-----------------------------------------------------------------------------------------------*/
-//struct MyVertex
-//{
-//    vec4 _pos;
-//    vec4 _normal;
-//};
-//
-///*-----------------------------------------------------------------------------------------------
-//Description:
-//    This demo is in 2D, so each polygon face is described by two vertices.  In 3D, this 
-//    structure will be updated to contain three.
-//    
-//    Must match the version on the CPU side.
-//Creator: John Cox (9-25-2016)
-//-----------------------------------------------------------------------------------------------*/
-//struct PolygonFace
-//{
-//    MyVertex _start;
-//    MyVertex _end;
-//};
-//
 
 /*-----------------------------------------------------------------------------------------------
 Description:
@@ -90,55 +59,21 @@ layout (std430) buffer ParticleBuffer
     Particle AllParticles[];
 };
 
-///*-----------------------------------------------------------------------------------------------
-//Description:
-//    This is the array of polygon faces that the compute shader will access for bounds checking.  
-//    It is set up on the CPU side in PolygonSsbo::Init(...).
-//Creator: John Cox (9-25-2016)
-//-----------------------------------------------------------------------------------------------*/
-//uniform uint uPolygonFaceCount;
-//layout (std430) buffer FaceBuffer
-//{
-//    PolygonFace PolygonRegionFaces[];
-//};
 
 /*-----------------------------------------------------------------------------------------------
 Description:
-    Checks if the provided particle has gone outside of any of the faces specified in the 
-    PolygonRegionFaces buffer.
-
-    Note: This algorithm only works on concave polygons.  That is, it only works on a polygon in 
-    which all face normals point roughly towards the center.  This algorithm simply checks if a 
-    vector from the face (either start or end; both work) to the particle's position is more 
-    than 90 degrees away the face normal.
+    Checks if the provided particle has gone outside the circle that defines where particles are 
+    "active".
 Parameters:
-    p   A Particle instance.  It is not a reference or a pointer (GLSL doesn't do either), but a 
-        copy.  If can therefore be used as a local variable, but as a matter of personal coding 
-        principle, I do not use an argument as a local variable.
+    particleIndex   An index into the AllParticles array.
 Returns:
-    A semi-random float on the range [-1,+1].
-Creator: John Cox (9-25-2016)
+    True if the particle is out of bounds and should be reset, otherwise false.
+Creator: John Cox (1-7-2016)
 -----------------------------------------------------------------------------------------------*/
 uniform vec4 uParticleRegionCenter;
 uniform float uParticleRegionRadiusSqr;
-//uniform mat4 uWindowSpaceRegionTransform;
 bool ParticleOutOfBoundsPolygon(uint particleIndex)
 {
-    //for (int faceIndex = 0; faceIndex < uPolygonFaceCount; faceIndex++)
-    //{
-    //    PolygonFace f = PolygonRegionFaces[faceIndex];
-    //
-    //    // for this simple calculation, either the face's start or end point will work
-    //    //vec4 faceToParticle = p._pos - (uWindowSpaceRegionTransform * f._start._pos);
-    //    vec4 faceToParticle = p._pos - (f._start._pos);
-    //    //vec4 rotatedNormal = uWindowSpaceRegionTransform * f._start._normal;
-    //    vec4 rotatedNormal = f._start._normal;
-    //    if (dot(faceToParticle, rotatedNormal) > 0)
-    //    {
-    //        return true;
-    //    }
-    //}
-
     vec4 regionCenterToParticle = AllParticles[particleIndex]._pos - uParticleRegionCenter;
 
     // partial pythagorean theorem
@@ -170,28 +105,32 @@ void main()
         Particle p = AllParticles[index];
 
         // only update active particles 
-        if (p._isActive == 1)
+        if (p._isActive == 0)
         {
-            // when the compute shader is summoned to update active particles, this counter 
-            // will give a count of how many active particles exist
-            atomicCounterIncrement(acActiveParticleCounter);
-
-            vec4 deltaPosition = p._vel * uDeltaTimeSec;
-            p._pos = p._pos + deltaPosition;
-
-            // if it went out of bounds, reset it
-            if (ParticleOutOfBoundsPolygon(index))
-            {
-                p._isActive = 0;
-            }                
-
-            // copy the updated one back into the array
-            AllParticles[index] = p;
+            return;
         }
-        else
+
+        // when the compute shader is summoned to update active particles, this counter will 
+        // give a count of how many active particles exist
+        atomicCounterIncrement(acActiveParticleCounter);
+
+        vec4 acceleration = p._netForceThisFrame / p._mass;
+        p._vel += (acceleration * uDeltaTimeSec);
+        p._pos += (p._vel * uDeltaTimeSec);
+
+        // if it went out of bounds, reset it
+        if (ParticleOutOfBoundsPolygon(index))
         {
-            // particle inactive, so nuttin' to do
-        }
+            p._isActive = 0;
+        }                
+
+        // regardless of whether it went out of bounds or not, reset the net force and collision 
+        // count for this frame
+        p._netForceThisFrame = vec4(0,0,0,0);
+        p._collisionCountThisFrame = 0;
+
+        // copy the updated one back into the array
+        AllParticles[index] = p;
     }
 }
 

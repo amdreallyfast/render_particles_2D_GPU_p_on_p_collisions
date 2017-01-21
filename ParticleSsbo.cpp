@@ -123,10 +123,11 @@ void ParticleSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int dr
     // vertex attribute order is same as the structure
     // - glm::vec4 _position;
     // - glm::vec4 _velocity;
-    // - glm::vec4 _netForce;
+    // - glm::vec4 _netForceThisFrame;
     // - int _collisionCountThisFrame;
     // - float _mass;
     // - float _radiusOfInfluence;
+    // - unsigned int _indexOfNodeThatItIsOccupying;
     // - int _isActive;
 
     unsigned int vertexArrayIndex = 0;
@@ -154,13 +155,13 @@ void ParticleSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int dr
 
     // net force
     itemType = GL_FLOAT;
-    numItems = sizeof(Particle::_netForce) / sizeof(float);
+    numItems = sizeof(Particle::_netForceThisFrame) / sizeof(float);
     bufferStartOffset += sizeOfLastItem;
     vertexArrayIndex++;
     glEnableVertexAttribArray(vertexArrayIndex);
     glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
         (void *)bufferStartOffset);
-    sizeOfLastItem = sizeof(Particle::_netForce);
+    sizeOfLastItem = sizeof(Particle::_netForceThisFrame);
 
     // collision count this frame
     itemType = GL_INT;
@@ -191,6 +192,16 @@ void ParticleSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int dr
     glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
         (void *)bufferStartOffset);
     sizeOfLastItem = sizeof(Particle::_radiusOfInfluence);
+
+    // index of node that it is occupying
+    itemType = GL_UNSIGNED_INT;
+    numItems = sizeof(Particle::_indexOfNodeThatItIsOccupying) / sizeof(unsigned int);
+    bufferStartOffset += sizeOfLastItem;
+    vertexArrayIndex++;
+    glEnableVertexAttribArray(vertexArrayIndex);
+    glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
+        (void *)bufferStartOffset);
+    sizeOfLastItem = sizeof(Particle::_indexOfNodeThatItIsOccupying);
 
     // "is active" flag
     itemType = GL_INT;

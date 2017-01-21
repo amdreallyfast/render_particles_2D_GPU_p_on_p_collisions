@@ -53,6 +53,9 @@
     <ClCompile Include="QuadTreeNodeSsbo.cpp">
       <Filter>Buffers</Filter>
     </ClCompile>
+    <ClCompile Include="ComputeQuadTreeParticleCollisions.cpp">
+      <Filter>ComputeShaderLaunchers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="OpenGlErrorHandling.h" />

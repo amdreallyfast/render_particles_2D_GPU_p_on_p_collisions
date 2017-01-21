@@ -1,9 +1,7 @@
 #version 440
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
-layout (binding = 3, offset = 0) uniform atomic_uint acNodesInUse;
-//layout (binding = 3, offset = 4) uniform atomic_uint acParticleCounterPerNode[512];
-layout (binding = 3, offset = 4) uniform atomic_uint acParticleCounterPerNode[16383];
+layout (binding = 3, offset = 0) uniform atomic_uint acParticleCounterPerNode[16384];
 
 
 /*-----------------------------------------------------------------------------------------------
@@ -12,11 +10,11 @@ Description:
     meant for use only by ParticleQuadTree.
 Creator:    John Cox (12-17-2016)
 -----------------------------------------------------------------------------------------------*/
-uniform uint uMaxParticlesPerNode;
+const uint MAX_PARTICLES_PER_NODE = 100;
 struct ParticleQuadTreeNode
 {
     // this array size MUST match the value specified on the CPU side
-    uint _indicesForContainedParticles[25];
+    uint _indicesForContainedParticles[MAX_PARTICLES_PER_NODE];
     uint _numCurrentParticles;
 
     int _inUse;
@@ -51,10 +49,11 @@ struct Particle
 {
     vec4 _pos;
     vec4 _vel;
-    vec4 _netForce;
+    vec4 _netForceThisFrame;
     int _collisionCountThisFrame;
     float _mass;
     float _radiusOfInfluence;
+    unsigned int _indexOfNodeThatItIsOccupying;
     int _isActive;
 };
 
@@ -64,7 +63,6 @@ Description:
     Rather self-explanatory.
 Creator: John Cox (1-10-2017)
 -----------------------------------------------------------------------------------------------*/
-uniform uint uMaxNodes;
 layout (std430) buffer QuadTreeNodeBuffer
 {
     ParticleQuadTreeNode AllNodes[];
@@ -85,255 +83,6 @@ layout (std430) buffer ParticleBuffer
     Particle AllParticles[];
 };
 
-/*-----------------------------------------------------------------------------------------------
-Description:
-    Grabs four unused nodes from the "all nodes" array, sets their bounds as four quadrants of 
-    the parent node that needs to be subdivided, populates them with that node's particles, and 
-    empties the parent node.
-
-Parameters: 
-    nodeIndex       The quad tree node to split
-Returns:    
-    True if all went well, otherwise false.
-Exception:  Safe
-Creator:    John Cox (1-12-2017) (adapted from CPU version, 12-17-2016)
------------------------------------------------------------------------------------------------*/
-bool SubdivideNode(uint nodeIndex)
-{    
-    // generate 4 more children
-    // Note: Atomic counter incrementing is like an index++ operation.  That is, it returns the current value, THEN increments it, so it is safe to use the return value of an increment on the "nodes in use" atomic counter as a 0-based index.  https://www.khronos.org/opengl/wiki/Atomic_Counter#Operations.
-    uint childNodeIndexTopLeft = atomicCounterIncrement(acNodesInUse);
-    uint childNodeIndexTopRight = atomicCounterIncrement(acNodesInUse);
-    uint childNodeIndexBottomRight = atomicCounterIncrement(acNodesInUse);
-    uint childNodeIndexBottomLeft = atomicCounterIncrement(acNodesInUse);
-
-    // make a copy of the node and its new children, modify them, and write them back at the end
-    // Note: A lot of the members of the ParticleQuadTreeNode need to be accessed.  It will be easier for typing, and possibly more cache friendly, to make a local copy of the nodes that are being read from or written to than to always be accessing the SSBO for every member of every node.
-    ParticleQuadTreeNode nodeCopy = AllNodes[nodeIndex];
-    ParticleQuadTreeNode childTopLeft = AllNodes[childNodeIndexTopLeft];
-    ParticleQuadTreeNode childTopRight = AllNodes[childNodeIndexTopRight];
-    ParticleQuadTreeNode childBottomRight = AllNodes[childNodeIndexBottomRight];
-    ParticleQuadTreeNode childBottomLeft = AllNodes[childNodeIndexBottomLeft];
-
-    // record the child in the node that is being subdivided
-    nodeCopy._isSubdivided = 1;
-    nodeCopy._childNodeIndexTopLeft = childNodeIndexTopLeft;
-    nodeCopy._childNodeIndexTopRight = childNodeIndexTopRight;
-    nodeCopy._childNodeIndexBottomRight = childNodeIndexBottomRight;
-    nodeCopy._childNodeIndexBottomLeft = childNodeIndexBottomLeft;
-
-    // assign neighbors, edges, and divide the particles between the child nodes
-    // Note: Neighbor assignment isn't so bad in 2D, when I only have ((3 * 3) - 1 center node) = 8 neighbors, but this is going to get really messy when I move to 3D and have to use octrees, each with ((3 * 3 * 3) - 1 center node) = 26 neighbors;
-    float nodeXCenter = (nodeCopy._leftEdge + nodeCopy._rightEdge) * 0.5f;
-    float nodeYCenter = (nodeCopy._bottomEdge + nodeCopy._topEdge) * 0.5f;
-
-    // top left child
-    childTopLeft._neighborIndexLeft = nodeCopy._neighborIndexLeft;
-    childTopLeft._neighborIndexTopLeft = nodeCopy._neighborIndexTopLeft;
-    childTopLeft._neighborIndexTop = nodeCopy._neighborIndexTop;
-    childTopLeft._neighborIndexTopRight = nodeCopy._neighborIndexTop;
-    childTopLeft._neighborIndexRight = childNodeIndexTopRight;
-    childTopLeft._neighborIndexBottomRight = childNodeIndexBottomRight;
-    childTopLeft._neighborIndexBottom = childNodeIndexBottomLeft;
-    childTopLeft._neighborIndexBottomLeft = nodeCopy._neighborIndexLeft;
-    childTopLeft._leftEdge = nodeCopy._leftEdge;
-    childTopLeft._topEdge = nodeCopy._topEdge;
-    childTopLeft._rightEdge = nodeXCenter;
-    childTopLeft._bottomEdge = nodeYCenter;
-
-    // top right child
-    childTopRight._neighborIndexLeft = childNodeIndexTopLeft;
-    childTopRight._neighborIndexTopLeft = nodeCopy._neighborIndexTop;
-    childTopRight._neighborIndexTop = nodeCopy._neighborIndexTop;
-    childTopRight._neighborIndexTopRight = nodeCopy._neighborIndexTopRight;
-    childTopRight._neighborIndexRight = nodeCopy._neighborIndexRight;
-    childTopRight._neighborIndexBottomRight = nodeCopy._neighborIndexRight;
-    childTopRight._neighborIndexBottom = childNodeIndexBottomRight;
-    childTopRight._neighborIndexBottomLeft = childNodeIndexBottomLeft;
-    childTopRight._leftEdge = nodeXCenter;
-    childTopRight._topEdge = nodeCopy._topEdge;
-    childTopRight._rightEdge = nodeCopy._rightEdge;
-    childTopRight._bottomEdge = nodeYCenter;
-
-    // bottom right child
-    childBottomRight._neighborIndexLeft = childNodeIndexBottomLeft;
-    childBottomRight._neighborIndexTopLeft = childNodeIndexTopLeft;
-    childBottomRight._neighborIndexTop = childNodeIndexTopRight;
-    childBottomRight._neighborIndexTopRight = nodeCopy._neighborIndexRight;
-    childBottomRight._neighborIndexRight = nodeCopy._neighborIndexRight;
-    childBottomRight._neighborIndexBottomRight = nodeCopy._neighborIndexBottomRight;
-    childBottomRight._neighborIndexBottom = nodeCopy._neighborIndexBottom;
-    childBottomRight._neighborIndexBottomLeft = nodeCopy._neighborIndexBottom;
-    childBottomRight._leftEdge = nodeXCenter;
-    childBottomRight._topEdge = nodeYCenter;
-    childBottomRight._rightEdge = nodeCopy._rightEdge;
-    childBottomRight._bottomEdge = nodeCopy._bottomEdge;
-
-    // bottom left child
-    childBottomLeft._neighborIndexLeft = nodeCopy._neighborIndexLeft;
-    childBottomLeft._neighborIndexTopLeft = nodeCopy._neighborIndexLeft;
-    childBottomLeft._neighborIndexTop = childNodeIndexTopLeft;
-    childBottomLeft._neighborIndexTopRight = childNodeIndexTopRight;
-    childBottomLeft._neighborIndexRight = childNodeIndexBottomRight;
-    childBottomLeft._neighborIndexBottomRight = nodeCopy._neighborIndexBottom;
-    childBottomLeft._neighborIndexBottom = nodeCopy._neighborIndexBottom;
-    childBottomLeft._neighborIndexBottomLeft = nodeCopy._neighborIndexBottomLeft;
-    childBottomLeft._leftEdge = nodeCopy._leftEdge;
-    childBottomLeft._topEdge = nodeYCenter;
-    childBottomLeft._rightEdge = nodeXCenter;
-    childBottomLeft._bottomEdge = nodeCopy._bottomEdge;
-
-    // add all particles to children
-    for (uint particleCount = 0; particleCount < nodeCopy._numCurrentParticles; particleCount++)
-    {
-        uint particleIndex = nodeCopy._indicesForContainedParticles[particleCount];
-        vec4 particlePos = AllParticles[particleIndex]._pos;
-
-        // the node is subdivided, so add the particle to the child nodes
-        int childNodeIndex = -1;
-        if (particlePos.x < nodeXCenter)
-        {
-            // left half of the node
-            if (particlePos.y > nodeYCenter)
-            {
-                // top half of the node
-                childTopLeft._indicesForContainedParticles[childTopLeft._numCurrentParticles] = particleIndex;
-                childTopLeft._numCurrentParticles++;
-            }
-            else
-            {
-                // bottom half of the node
-                childBottomLeft._indicesForContainedParticles[childBottomLeft._numCurrentParticles] = particleIndex;
-                childBottomLeft._numCurrentParticles++;
-            }
-        }
-        else
-        {
-            // right half of the node
-            if (particlePos.y > nodeYCenter)
-            {
-                // top half of the node
-                childTopRight._indicesForContainedParticles[childTopRight._numCurrentParticles] = particleIndex;
-                childTopRight._numCurrentParticles++;
-            }
-            else
-            {
-                // bottom half of the node
-                childBottomRight._indicesForContainedParticles[childBottomRight._numCurrentParticles] = particleIndex;
-                childBottomRight._numCurrentParticles++;
-            }
-        }
-
-        // not actually necessary because the array will be run over on the next update, but I 
-        // still like to clean up after myself 
-        nodeCopy._indicesForContainedParticles[particleCount] = 0;
-    }
-
-    nodeCopy._numCurrentParticles = 0;
-
-    // write back the subdivided node and its new children
-    AllNodes[nodeIndex] = nodeCopy;
-    AllNodes[childNodeIndexTopLeft] = childTopLeft;
-    AllNodes[childNodeIndexTopRight] = childTopRight;
-    AllNodes[childNodeIndexBottomRight] = childBottomRight;
-    AllNodes[childNodeIndexBottomLeft] = childBottomLeft;
-
-    // all went well
-    return true;
-}
-
-/*-----------------------------------------------------------------------------------------------
-Description:
-    Adds the specified particle to the specified node.  If the new particle will push the node 
-    over its particle containment limit, then it subdivides and populates its new children with 
-    its own particles.
-
-    Note: This function does not sanitize the input.  The purpose of this function is to create 
-    a connection between a particle and a node.  Be nice to it and check particle bounds first.
-
-    Also Note: GLSL does not allow recursion, but any recursive algorithm can be turned into a loop.  I am handling this by returning a uint.  If 0, then do not call it again for this particle.  Otherwise it is > 0 and needs to be called again with the same particle index but the returned node index.
-
-Parameters: 
-    particleIndex   The particle that needs to be added.
-    nodeIndex       The quad tree node to add the particle to.
-Returns:    
-    A node index if it needs to be called again, otherwise 0xffffffff (max uint);
-Exception:  Safe
-Creator:    John Cox (1-12-2017) (adapted from CPU version, 12-17-2016)
------------------------------------------------------------------------------------------------*/
-uint AddParticleToNode(uint particleIndex, uint nodeIndex)
-{
-    uint destinationNodeIndex = 0;
-    uint allDone = 0xffffffff;
-    
-    ParticleQuadTreeNode nodeCopy = AllNodes[nodeIndex];
-
-    if (AllNodes[nodeIndex]._isSubdivided == 0)
-    {
-        // not subdivided (yet), so add the particle to the provided node
-        uint numParticlesThisNode = nodeCopy._numCurrentParticles;
-        if (numParticlesThisNode == uMaxParticlesPerNode)
-        {
-            // ran out of space, so split the node and add the particles to its children
-            if (!SubdivideNode(nodeIndex))
-            {
-                // no space left, so don't bother calling it again
-                return allDone;
-            }
-
-            // add the particle to this same node again, which will use the "is subdivided" logic
-            destinationNodeIndex = nodeIndex;
-        }
-        else
-        {
-            // END OF LINE
-            // Note: It's ok to use this as an index because the "== MAX" check was already done.
-            AllNodes[nodeIndex]._indicesForContainedParticles[numParticlesThisNode] = particleIndex;
-            AllNodes[nodeIndex]._numCurrentParticles++;
-            return allDone;
-        }
-    }
-    else
-    {
-        // the node is subdivided, so add the particle to the child nodes
-        float nodeXCenter = (nodeCopy._leftEdge + nodeCopy._rightEdge) * 0.5f;
-        float nodeYCenter = (nodeCopy._bottomEdge + nodeCopy._topEdge) * 0.5f;
-
-        vec4 particlePos = AllParticles[particleIndex]._pos;
-
-        if (particlePos.x < nodeXCenter)
-        {
-            // left half
-            if (particlePos.y > nodeYCenter)
-            {
-                // top half
-                destinationNodeIndex = nodeCopy._childNodeIndexTopLeft;
-            }
-            else
-            {
-                // bottom half
-                destinationNodeIndex = nodeCopy._childNodeIndexBottomLeft;
-            }
-        }
-        else
-        {
-            // right half
-            if (particlePos.y > nodeYCenter)
-            {
-                // top half
-                destinationNodeIndex = nodeCopy._childNodeIndexTopRight;
-            }
-            else
-            {
-                // bottom half
-                destinationNodeIndex = nodeCopy._childNodeIndexBottomRight;
-            }
-        }
-    }
-
-    // this node is subdivided and the particle needs to be added to its children, so this function needs to be called again
-    return destinationNodeIndex;
-}
 
 /*-----------------------------------------------------------------------------------------------
 Description:
@@ -379,7 +128,8 @@ void main()
     //  col index = (int)((p.pos.x - (c.x - r)) / xIncrementPerColumn);
     //  row index = (int)(((c.y + r) - p.pos.y) / yIncrementPerRow);
     //
-    // Also Also Note: The integer rounding should NOT be rounded to the nearest integer.  Array indices start at 0, so any value between 0 and 1 is considered to be in the 0th index.
+    // Also Also Note: The integer rounding should NOT be rounded to the nearest integer.  Array 
+    // indices start at 0.  Any value between 0 and 1 is considered to be in the 0th index.
 
     // column
     float leftEdge = uParticleRegionCenter.x - uParticleRegionRadius;
@@ -394,10 +144,27 @@ void main()
     uint rowInteger = uint(floor(rowFloat));
 
     // same index calculation as the tree initialization 
-    // Note: The initially calculated node may belong to a subdivided node.  The index of the actual node that the particle is added to may be different, hence the "initial".
-    uint initialNodeIndex = (rowInteger * uNumColumnsInTreeInitial) + colInteger;
+    uint nodeIndex = (rowInteger * uNumColumnsInTreeInitial) + colInteger;
 
-    AllNodes[initialNodeIndex]._numCurrentParticles = atomicCounterIncrement(acParticleCounterPerNode[initialNodeIndex]);
+    // don't bother checking the index
+    // Note: If the index > uMaxNodes, then the calculation went bad.  Let it blow up so that it 
+    // can be noticed and fixed.
+
+    if (AllNodes[nodeIndex]._numCurrentParticles == MAX_PARTICLES_PER_NODE)
+    {
+        // not enough space
+        return;
+    }
+
+    // write directly to the node because someone else might be writing to it at the same time
+    uint newParticleCount = atomicCounterIncrement(acParticleCounterPerNode[nodeIndex]);
+    AllNodes[nodeIndex]._numCurrentParticles = newParticleCount;
+    AllNodes[nodeIndex]._indicesForContainedParticles[newParticleCount] = particleIndex;
+
+    // the shader is unique tp this particle, so it is okay to write to a copy and then write 
+    // the copy back into the buffer
+    p._indexOfNodeThatItIsOccupying = nodeIndex;
+    AllParticles[particleIndex] = p;
 
 }
 

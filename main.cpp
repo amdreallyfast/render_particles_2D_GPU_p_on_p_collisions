@@ -51,6 +51,7 @@
 #include "ComputeParticleReset.h"
 #include "ComputeParticleUpdate.h"
 #include "ComputeQuadTreePopulate.h"
+#include "ComputeQuadTreeParticleCollisions.h"
 
 // for moving the shapes around in window space
 #include "glm/gtc/matrix_transform.hpp"
@@ -81,6 +82,7 @@ ComputeParticleUpdate *gpParticleUpdater = 0;
 ComputeQuadTreeReset *gpQuadTreeReseter = 0;
 ComputeQuadTreeGenerateGeometry *gpQuadTreeGeometryGenerator = 0;
 ComputeQuadTreePopulate *gpQuadTreePopulater = 0;
+ComputeParticleQuadTreeCollisions *gpQuadTreeParticleCollider = 0;
 
 const unsigned int MAX_PARTICLE_COUNT = 100000;
 
@@ -268,6 +270,11 @@ void Init()
     shaderStorageRef.AddShaderFile(computeQuadTreePopulateKey, "quadTreePopulate.comp", GL_COMPUTE_SHADER);
     shaderStorageRef.LinkShader(computeQuadTreePopulateKey);
 
+    std::string computeQuadTreeParticleColliderKey = "compute quad tree collider";
+    shaderStorageRef.NewShader(computeQuadTreeParticleColliderKey);
+    shaderStorageRef.AddShaderFile(computeQuadTreeParticleColliderKey, "quadTreeParticleCollisions.comp", GL_COMPUTE_SHADER);
+    shaderStorageRef.LinkShader(computeQuadTreeParticleColliderKey);
+
     std::string computeQuadTreeGenerateGeometryKey = "compute quad tree generate geometry";
     shaderStorageRef.NewShader(computeQuadTreeGenerateGeometryKey);
     shaderStorageRef.AddShaderFile(computeQuadTreeGenerateGeometryKey, "quadTreeGenerateGeometry.comp", GL_COMPUTE_SHADER);
@@ -313,6 +320,7 @@ void Init()
     gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderResetKey), "ParticleBuffer");
     gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderUpdateKey), "ParticleBuffer");
     gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeQuadTreePopulateKey), "ParticleBuffer");
+    gpParticleBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeQuadTreeParticleColliderKey), "ParticleBuffer");
     gpParticleBuffer->ConfigureRender(shaderStorageRef.GetShaderProgram(renderParticlesShaderKey), GL_POINTS);
 
     // set up the quad tree for computation
@@ -320,6 +328,7 @@ void Init()
     gpQuadTreeBuffer = new QuadTreeNodeSsbo(quadTree._allQuadTreeNodes);
     gpQuadTreeBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeShaderQuadTreeResetKey), "QuadTreeNodeBuffer");
     gpQuadTreeBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeQuadTreePopulateKey), "QuadTreeNodeBuffer");
+    gpQuadTreeBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeQuadTreeParticleColliderKey), "QuadTreeNodeBuffer");
     gpQuadTreeBuffer->ConfigureCompute(shaderStorageRef.GetShaderProgram(computeQuadTreeGenerateGeometryKey), "QuadTreeNodeBuffer");
 
     // set up the quad tree's nodes for rendering
@@ -360,7 +369,9 @@ void Init()
 
     gpQuadTreeGeometryGenerator = new ComputeQuadTreeGenerateGeometry(ParticleQuadTree::_MAX_NODES, allPolygonFaces, computeQuadTreeGenerateGeometryKey);
 
-    gpQuadTreePopulater = new ComputeQuadTreePopulate(ParticleQuadTreeNode::MAX_PARTICLES_PER_QUAD_TREE_NODE, ParticleQuadTree::_MAX_NODES, MAX_PARTICLE_COUNT, particleRegionRadius, particleRegionCenter, ParticleQuadTree::_NUM_COLUMNS_IN_TREE_INITIAL, ParticleQuadTree::_NUM_ROWS_IN_TREE_INITIAL, ParticleQuadTree::_NUM_STARTING_NODES, computeQuadTreePopulateKey);
+    gpQuadTreePopulater = new ComputeQuadTreePopulate(ParticleQuadTree::_MAX_NODES, MAX_PARTICLE_COUNT, particleRegionRadius, particleRegionCenter, ParticleQuadTree::_NUM_COLUMNS_IN_TREE_INITIAL, ParticleQuadTree::_NUM_ROWS_IN_TREE_INITIAL, ParticleQuadTree::_NUM_STARTING_NODES, computeQuadTreePopulateKey);
+
+    gpQuadTreeParticleCollider = new ComputeParticleQuadTreeCollisions(MAX_PARTICLE_COUNT, computeQuadTreeParticleColliderKey);
 
     // the timer will be used for framerate calculations
     gTimer.Init();
@@ -391,32 +402,29 @@ void UpdateAllTheThings()
 
     gpQuadTreeReseter->ResetQuadTree();
     gpQuadTreePopulater->PopulateTree();
+    gpQuadTreeParticleCollider->Update(deltaTimeSec);
     gpQuadTreeGeometryGenerator->GenerateGeometry();
 
-    GLuint bufferSizeBytes = sizeof(ParticleQuadTreeNode) * ParticleQuadTree::_MAX_NODES;
+
+    GLuint bufferSizeBytes = sizeof(Particle) * MAX_PARTICLE_COUNT;
     GLuint copyBufferId;
     glGenBuffers(1, &copyBufferId);
     glBindBuffer(GL_COPY_WRITE_BUFFER, copyBufferId);
     glBufferData(GL_COPY_WRITE_BUFFER, bufferSizeBytes, 0, GL_DYNAMIC_COPY);
-    glBindBuffer(GL_COPY_READ_BUFFER, gpQuadTreeBuffer->BufferId());
+    glBindBuffer(GL_COPY_READ_BUFFER, gpParticleBuffer->BufferId());
     glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, bufferSizeBytes);
     void *bufferPtr = glMapBuffer(GL_COPY_WRITE_BUFFER, GL_READ_ONLY);
-    ParticleQuadTreeNode *nodePtr = static_cast<ParticleQuadTreeNode *>(bufferPtr);
-
-    size_t indexOfMostPopulatedNode = 0;
-    size_t numParticlesInMostPopulatedNode = 0;
-    for (size_t nodeIndex = 0; nodeIndex < ParticleQuadTree::_MAX_NODES; nodeIndex++)
+    Particle *objPtr = static_cast<Particle *>(bufferPtr);
+    
+    for (size_t i = 0; i < MAX_PARTICLE_COUNT; i++)
     {
-        ParticleQuadTreeNode &node = nodePtr[nodeIndex];
-        if (node._numCurrentParticles > numParticlesInMostPopulatedNode)
+        Particle &p = objPtr[i];
+        if (p._collisionCountThisFrame != 1)
         {
-            numParticlesInMostPopulatedNode = node._numCurrentParticles;
-            indexOfMostPopulatedNode = nodeIndex;
+            printf("");
         }
     }
 
-    printf("most populated node is index '%d' with '%d' nodes\n", indexOfMostPopulatedNode, numParticlesInMostPopulatedNode);
-    
     glUnmapBuffer(GL_COPY_WRITE_BUFFER);
     glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
     glBindBuffer(GL_COPY_READ_BUFFER, 0);
@@ -462,13 +470,13 @@ void Display()
     glBindVertexArray(vaoId);
     glDrawArrays(drawStyle, 0, numVertices);
 
-    // draw the nodes of the quad tree
-    // Note: Keep using the "render geometry" shader.
-    vaoId = gpQuadTreeGeometryBuffer->VaoId();
-    drawStyle = gpQuadTreeGeometryBuffer->DrawStyle();
-    numVertices = gpQuadTreeGeometryGenerator->NumActiveFaces() * 2;
-    glBindVertexArray(vaoId);
-    glDrawArrays(drawStyle, 0, numVertices);
+    //// draw the nodes of the quad tree
+    //// Note: Keep using the "render geometry" shader.
+    //vaoId = gpQuadTreeGeometryBuffer->VaoId();
+    //drawStyle = gpQuadTreeGeometryBuffer->DrawStyle();
+    //numVertices = gpQuadTreeGeometryGenerator->NumActiveFaces() * 2;
+    //glBindVertexArray(vaoId);
+    //glDrawArrays(drawStyle, 0, numVertices);
 
     // draw the particles
     glUseProgram(ShaderStorage::GetInstance().GetShaderProgram("render particles"));
@@ -647,7 +655,7 @@ int main(int argc, char *argv[])
     glutInitContextProfile(GLUT_CORE_PROFILE);
 
     // enable this for automatic message reporting (see OpenGlErrorHandling.cpp)
-//#define DEBUG
+#define DEBUG
 #ifdef DEBUG
     glutInitContextFlags(GLUT_DEBUG);
 #endif

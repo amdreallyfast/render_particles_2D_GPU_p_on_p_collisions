@@ -34,7 +34,7 @@ struct ParticleQuadTreeNode
         memset(_indicesForContainedParticles, 0, sizeof(int) * MAX_PARTICLES_PER_QUAD_TREE_NODE);
     }
 
-    static const unsigned int MAX_PARTICLES_PER_QUAD_TREE_NODE = 25;
+    static const unsigned int MAX_PARTICLES_PER_QUAD_TREE_NODE = 100;
 
     unsigned int _indicesForContainedParticles[MAX_PARTICLES_PER_QUAD_TREE_NODE];
     unsigned int _numCurrentParticles;

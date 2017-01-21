@@ -8,10 +8,11 @@ Description:
     meant for use only by ParticleQuadTree.
 Creator:    John Cox (12-17-2016)
 -----------------------------------------------------------------------------------------------*/
+const uint MAX_PARTICLES_PER_NODE = 100;
 struct ParticleQuadTreeNode
 {
     // this array size MUST match the value specified on the CPU side
-    int _indicesForContainedParticles[25];
+    int _indicesForContainedParticles[MAX_PARTICLES_PER_NODE];
     int _numCurrentParticles;
 
     int _inUse;

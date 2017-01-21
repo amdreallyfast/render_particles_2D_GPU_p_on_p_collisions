@@ -26,6 +26,7 @@ struct Particle
         _collisionCountThisFrame(0),
         _mass(0.1f),
         _radiusOfInfluence(0.01f),
+        _indexOfNodeThatItIsOccupying(0),
         _isActive(0)
     {
     }
@@ -39,7 +40,7 @@ struct Particle
     // Note: Yes, I did take care of the byte offset in the vertex attrib pointer.
     glm::vec4 _position;
     glm::vec4 _velocity;
-    glm::vec4 _netForce;
+    glm::vec4 _netForceThisFrame;
 
     // used to determine color 
     // TODO: decide between this for color blending or net force
@@ -52,10 +53,18 @@ struct Particle
     // particles' position are almost never going to be exactly equal
     float _radiusOfInfluence;
 
+    // will help improve efficiency in particle collision handling
+    // Note: Rather than having each node run through its particle collection, which would leave 
+    // some shaders with nothing to do and others a lot to do, have the particle collision 
+    // calculations go by each particle.  This should even out the load of detecting particle 
+    // collisions within a node and withi its neighbors.
+    unsigned int _indexOfNodeThatItIsOccupying;
+
     // Note: Booleans cannot be uploaded to the shader 
     // (https://www.opengl.org/sdk/docs/man/html/glVertexAttribPointer.xhtml), so send the 
     // "is active" flag as an integer.  
     int _isActive; 
     
     // any necessary padding out to 16 bytes to match the GPU's version
+    int _padding[3];
 };
