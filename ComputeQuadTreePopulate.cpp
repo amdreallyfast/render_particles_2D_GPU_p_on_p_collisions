@@ -25,9 +25,8 @@ ComputeQuadTreePopulate::ComputeQuadTreePopulate(
     _activeNodes(0),
     _initialNodes(0),
     _atomicCounterBufferId(0),
-    _acNodesInUseOffset(0),
-    _acNodeSubdivisionCrudeMutexOffset(0),
-    _acNodeAccessCrudeMutexsOffset(0),
+    _acOffsetNodesInUse(0),
+    _acOffsetParticleCounterPerNode(0),
     _acNodesInUseCopyBufferId(0),
     _unifLocMaxParticlesPerNode(-1),
     _unifLocMaxNodes(-1),
@@ -75,12 +74,11 @@ ComputeQuadTreePopulate::ComputeQuadTreePopulate(
 
     // atomic counters:
     // - nodes in use
-    // - subdivision mutex
     // - node access mutexes (1 per node)
-    unsigned int numAtomicCounters = 2 + maxNodes;
+    unsigned int numAtomicCounters = 1 + maxNodes;
     glGenBuffers(1, &_atomicCounterBufferId);
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, _atomicCounterBufferId);
-    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint) * numAtomicCounters, 0, GL_DYNAMIC_READ);
+    glBufferData(GL_ATOMIC_COUNTER_BUFFER, sizeof(GLuint) * numAtomicCounters, 0, GL_DYNAMIC_DRAW);
 
     // now the copy buffer
     glGenBuffers(1, &_acNodesInUseCopyBufferId);
@@ -94,9 +92,8 @@ ComputeQuadTreePopulate::ComputeQuadTreePopulate(
 
     // don't need to have a program or bound buffer to set the buffer base
     // Note: The binding and the offsets MUST match those in the "quad tree populate" compute shader.
-    _acNodesInUseOffset = 0;
-    _acNodeSubdivisionCrudeMutexOffset = 4;
-    _acNodeAccessCrudeMutexsOffset = 8;
+    _acOffsetNodesInUse = 0;
+    _acOffsetParticleCounterPerNode = 4;
     glBindBufferBase(GL_ATOMIC_COUNTER_BUFFER, 3, _atomicCounterBufferId);
 
     // no base binding for the atomic counter copy buffer because that is not used in the shader
@@ -120,22 +117,22 @@ void ComputeQuadTreePopulate::PopulateTree()
     GLuint sizeOfOneAtomicCounter = sizeof(GLuint);
 
     // "nodes in use" is the number of nodes used in the tree's initial subdivision
-    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodesInUseOffset, sizeOfOneAtomicCounter, &_initialNodes);
+    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acOffsetNodesInUse, sizeOfOneAtomicCounter, &_initialNodes);
 
     //// the mutexes all initialize to 0
     //GLuint nada = 0;
     //glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodeSubdivisionCrudeMutexOffset, sizeOfOneAtomicCounter, &nada);
 
-    //std::vector<GLuint> allZeros(_totalNodes, 0);
-    //glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acNodeAccessCrudeMutexsOffset, sizeOfOneAtomicCounter * _totalNodes, allZeros.data());
+    std::vector<GLuint> allZeros(_totalNodes, 0);
+    glBufferSubData(GL_ATOMIC_COUNTER_BUFFER, _acOffsetParticleCounterPerNode, sizeOfOneAtomicCounter * _totalNodes, allZeros.data());
 
     // cleanup
     glBindBuffer(GL_ATOMIC_COUNTER_BUFFER, 0);
 
 
     // calculate the number of work groups and start the magic
-    //GLuint numWorkGroupsX = (_totalParticles / 256) + 1;
-    GLuint numWorkGroupsX = (_totalNodes / 256) + 1;
+    GLuint numWorkGroupsX = (_totalParticles / 256) + 1;
+    //GLuint numWorkGroupsX = (_totalNodes / 256) + 1;
     GLuint numWorkGroupsY = 1;
     GLuint numWorkGroupsZ = 1;
     glUseProgram(_computeProgramId);
@@ -146,7 +143,7 @@ void ComputeQuadTreePopulate::PopulateTree()
     // retrieve the number of active nodes in use (printed to screen)
     glBindBuffer(GL_COPY_READ_BUFFER, _atomicCounterBufferId);
     glBindBuffer(GL_COPY_WRITE_BUFFER, _acNodesInUseCopyBufferId);
-    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, _acNodesInUseOffset, 0, sizeof(GLuint));
+    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, _acOffsetNodesInUse, 0, sizeof(GLuint));
     void *bufferPtr = glMapBufferRange(GL_COPY_WRITE_BUFFER, 0, sizeof(GLuint), GL_MAP_READ_BIT);
     unsigned int *nodeCountPtr = static_cast<unsigned int *>(bufferPtr);
     _activeNodes = *nodeCountPtr;

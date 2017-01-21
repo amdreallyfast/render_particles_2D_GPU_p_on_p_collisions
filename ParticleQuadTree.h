@@ -26,8 +26,11 @@ public:
     // Note: This algorithm was built with the compute shader's implementation in mind.  These 
     // structures are meant to be used as if a compute shader was running it, hence all the 
     // arrays and a complete lack of runtime memory reallocation.
-    static const int _NUM_ROWS_IN_TREE_INITIAL = 8;
-    static const int _NUM_COLUMNS_IN_TREE_INITIAL = 8;
+    //static const int _NUM_ROWS_IN_TREE_INITIAL = 8;
+    //static const int _NUM_COLUMNS_IN_TREE_INITIAL = 8;
+    //static const int _NUM_STARTING_NODES = _NUM_ROWS_IN_TREE_INITIAL * _NUM_COLUMNS_IN_TREE_INITIAL;
+    static const int _NUM_ROWS_IN_TREE_INITIAL = 64;
+    static const int _NUM_COLUMNS_IN_TREE_INITIAL = 64;
     static const int _NUM_STARTING_NODES = _NUM_ROWS_IN_TREE_INITIAL * _NUM_COLUMNS_IN_TREE_INITIAL;
 
     // if you change this, MUST also change the array size of atomic counters in quadTreePopulate.comp

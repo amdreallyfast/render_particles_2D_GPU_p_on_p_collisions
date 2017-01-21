@@ -519,17 +519,6 @@ void Display()
 
     // tell the GPU to swap out the displayed buffer with the one that was just rendered
     glutSwapBuffers();
-
-    //// tell glut to call this display() function again on the next iteration of the main loop
-    //// Note: https://www.opengl.org/discussion_boards/showthread.php/168717-I-dont-understand-what-glutPostRedisplay()-does
-    //// Also Note: This display() function will also be registered to run if the window is moved
-    //// or if the viewport is resized.  If glutPostRedisplay() is not called, then as long as the
-    //// window stays put and doesn't resize, display() won't be called again (tested with 
-    //// debugging).
-    //// Also Also Note: It doesn't matter where this is called in this function.  It sets a flag
-    //// for glut's main loop and doesn't actually call the registered display function, but I 
-    //// got into the habbit of calling it at the end.
-    //glutPostRedisplay();
 }
 
 /*-----------------------------------------------------------------------------------------------
@@ -629,6 +618,7 @@ void CleanupAll()
     delete gpParticleEmitterBar2;
     delete gpParticleReseter;
     delete gpParticleUpdater;
+    delete gpQuadTreePopulater;
     delete gpQuadTreeReseter;
     delete gpQuadTreeGeometryGenerator;
 }

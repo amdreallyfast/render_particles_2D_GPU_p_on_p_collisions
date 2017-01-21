@@ -2,6 +2,8 @@
 
 layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
 layout (binding = 3, offset = 0) uniform atomic_uint acNodesInUse;
+//layout (binding = 3, offset = 4) uniform atomic_uint acParticleCounterPerNode[512];
+layout (binding = 3, offset = 4) uniform atomic_uint acParticleCounterPerNode[16383];
 
 
 /*-----------------------------------------------------------------------------------------------
@@ -350,102 +352,52 @@ uniform float uInverseXIncrementPerColumn;
 uniform float uInverseYIncrementPerRow;
 void main()
 {
-    uint nodeIndex = gl_GlobalInvocationID.x;
-    if (nodeIndex >= uMaxNodes)
+    uint particleIndex = gl_GlobalInvocationID.x;
+    if (particleIndex >= uMaxParticles)
     {
         return;
     }
 
-    ParticleQuadTreeNode node = AllNodes[nodeIndex];
+    Particle p = AllParticles[particleIndex];
 
-    if (node._inUse == 0)
+    if (p._isActive == 0)
     {
         return;
     }
-//
-//    node._numCurrentParticles++;
-
-    for (uint particleIndex = 0; particleIndex < uMaxParticles; particleIndex++)
-    {
-        Particle p = AllParticles[particleIndex];
-        bool particleIsActive = (p._isActive == 1);
-        bool withinXBounds = p._pos.x > node._leftEdge && p._pos.x < node._rightEdge;
-        bool withinYBounds = p._pos.y > node._bottomEdge && p._pos.y < node._topEdge;
-
-//        if (particleIsActive && withinXBounds && withinYBounds)
-//        {
-//            node._numCurrentParticles++;
-//        }
-
-        uint oldParticleCount = node._numCurrentParticles;
-        uint newParticleCount = node._numCurrentParticles + 1;
-
-        node._numCurrentParticles = (particleIsActive && withinXBounds && withinYBounds) ? newParticleCount : oldParticleCount;
 
 
-//        // avoid branch condition of an "if (...)" statement just for a ++
-//        Particle p = AllParticles[particleIndex];
-//        bool particleIsActive = (p._isActive == 1);
-//        bool withinXBounds = p._pos.x > node._leftEdge && p._pos.x < node._rightEdge;
-//        bool withinYBounds = p._pos.y > node._bottomEdge && p._pos.y < node._topEdge;
-//
-//        //bool particleIsInNode = particleIsActive && withinXBounds && withinYBounds;
-//        bool particleIsInNode = (p._pos.x == 0);
-//        uint oldParticleCount = node._numCurrentParticles;
-//        uint newParticleCount = node._numCurrentParticles + 1;
-//
-//        // Note: Trinary operators are not an option for choosing branching paths of logic, but they are very useful for selecting one of two values.  The best part about them, especially /from /the perspective of one of the GPU's cores, is that they don't translate to branching logic, which screws up the instruction pipeline.  Full-fledged CPUs aren't as affected by branching/ /logic, but a shader can benefit immensely from it.  I did this same particle counting logic with "if (!particleIsActive) continue" and "if (particleWithinBounds) numCurrentParticles+/+" /branches and the framerate was bogged down to ~20fps.  I switched to trinary operators for the same result, and the frame rate shot back up to ~60fps.  Very nice.
-//        //node._numCurrentParticles = particleIsInNode ? newParticleCount : oldParticleCount;
-//        node._numCurrentParticles = particleIsInNode ? 18 : 57;
-    }
-    
-    // write it back
-    AllNodes[nodeIndex] = node;
+    // I can't think of an intuitive explanation for why the following math works, but it does (I worked it out by hand, got it wrong, experimented, and got it right)
+    // Note: Row bounds are on the Y axis, column bounds are on the X axis.  I always get them mixed up because a row is horizontal (like X) and a column is vertical (like Y).
+    // Also Node:
+    //  col index   = (int)((particle.pos.x - quadTreeLeftEdge) / xIncrementPerColumn);
+    //  row index   = (int)((quadTreeTopEdge - particle.pos.y) / yIncrementPerRow);
+    // 
+    //  Let c = particle region center
+    //  Let r = particle region radius
+    //  Let p = particle
+    //  Then:
+    //  col index = (int)((p.pos.x - (c.x - r)) / xIncrementPerColumn);
+    //  row index = (int)(((c.y + r) - p.pos.y) / yIncrementPerRow);
+    //
+    // Also Also Note: The integer rounding should NOT be rounded to the nearest integer.  Array indices start at 0, so any value between 0 and 1 is considered to be in the 0th index.
 
+    // column
+    float leftEdge = uParticleRegionCenter.x - uParticleRegionRadius;
+    float xDiff = p._pos.x - leftEdge;
+    float colFloat = xDiff * uInverseXIncrementPerColumn;
+    uint colInteger = uint(floor(colFloat));
 
+    // row
+    float topEdge = uParticleRegionCenter.y + uParticleRegionRadius;
+    float yDiff = topEdge - p._pos.y;
+    float rowFloat = yDiff * uInverseYIncrementPerRow;
+    uint rowInteger = uint(floor(rowFloat));
 
-//    // I can't think of an intuitive explanation for why the following math works, but it does (I worked it out by hand, got it wrong, experimented, and got it right)
-//    // Note: Row bounds are on the Y axis, column bounds are on the X axis.  I always get them mixed up because a row is horizontal (like X) and a column is vertical (like Y).
-//    // Also Node:
-//    //  col index   = (int)((particle.pos.x - quadTreeLeftEdge) / xIncrementPerColumn);
-//    //  row index   = (int)((quadTreeTopEdge - particle.pos.y) / yIncrementPerRow);
-//    // 
-//    //  Let c = particle region center
-//    //  Let r = particle region radius
-//    //  Let p = particle
-//    //  Then:
-//    //  col index = (int)((p.pos.x - (c.x - r)) / xIncrementPerColumn);
-//    //  row index = (int)(((c.y + r) - p.pos.y) / yIncrementPerRow);
-//    //
-//    // Also Also Note: The integer rounding should NOT be rounded to the nearest integer.  Array indices start at 0, so any value between 0 and 1 is considered to be in the 0th index.
-//
-//    vec4 particlePos = AllParticles[particleIndex]._pos;
-//
-//    // column
-//    float leftEdge = uParticleRegionCenter.x - uParticleRegionRadius;
-//    float xDiff = particlePos.x - leftEdge;
-//    float colFloat = xDiff * uInverseXIncrementPerColumn;
-//    uint colInteger = uint(floor(colFloat));
-//
-//    // row
-//    float topEdge = uParticleRegionCenter.y + uParticleRegionRadius;
-//    float yDiff = topEdge - particlePos.y;
-//    float rowFloat = yDiff * uInverseYIncrementPerRow;
-//    uint rowInteger = uint(floor(rowFloat));
-//
-//    // same index calculation as the tree initialization 
-//    // Note: The initially calculated node may belong to a subdivided node.  The index of the actual node that the particle is added to may be different, hence the "initial".
-//    uint initialNodeIndex = (rowInteger * uNumColumnsInTreeInitial) + colInteger;
-//
-//    // recursively navigate the quad tree and add the particle
-//    // Note: GLSL does not allow recursion.  This loop is the best I could come up with.
-//    // Also Node: Using 0xffffffff as an "end of recursion" value because the node index needs to work with atomic counters, which can only be uint.  I'd rather not rely on an implicit -1 -> /max/ unsigned int conversion, so I will spell out max 32bit int.
-//    uint anotherNodeIndex = AddParticleToNode(particleIndex, initialNodeIndex);
-//    while (anotherNodeIndex != 0xffffffff)
-//    {
-//        anotherNodeIndex = AddParticleToNode(particleIndex, anotherNodeIndex);
-//    }
+    // same index calculation as the tree initialization 
+    // Note: The initially calculated node may belong to a subdivided node.  The index of the actual node that the particle is added to may be different, hence the "initial".
+    uint initialNodeIndex = (rowInteger * uNumColumnsInTreeInitial) + colInteger;
 
-    // done; particle has been added
+    AllNodes[initialNodeIndex]._numCurrentParticles = atomicCounterIncrement(acParticleCounterPerNode[initialNodeIndex]);
+
 }
 

@@ -37,9 +37,8 @@ private:
 
     // all atomic counts are lumped into one buffer
     unsigned int _atomicCounterBufferId;
-    unsigned int _acNodesInUseOffset;
-    unsigned int _acNodeSubdivisionCrudeMutexOffset;
-    unsigned int _acNodeAccessCrudeMutexsOffset;
+    unsigned int _acOffsetNodesInUse;
+    unsigned int _acOffsetParticleCounterPerNode;
 
     // similar to the copy atomic counter in ComputeParticleUpdate for "active particle count" , this is an atomic counter copy buffer for "active node count"
     unsigned int _acNodesInUseCopyBufferId;
