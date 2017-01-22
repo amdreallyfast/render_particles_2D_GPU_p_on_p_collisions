@@ -169,7 +169,7 @@ void ParticleSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int dr
     bufferStartOffset += sizeOfLastItem;
     vertexArrayIndex++;
     glEnableVertexAttribArray(vertexArrayIndex);
-    glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
+    glVertexAttribIPointer(vertexArrayIndex, numItems, itemType, bytesPerStep,
         (void *)bufferStartOffset);
     sizeOfLastItem = sizeof(Particle::_collisionCountThisFrame);
 
@@ -199,7 +199,7 @@ void ParticleSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int dr
     bufferStartOffset += sizeOfLastItem;
     vertexArrayIndex++;
     glEnableVertexAttribArray(vertexArrayIndex);
-    glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
+    glVertexAttribIPointer(vertexArrayIndex, numItems, itemType, bytesPerStep,
         (void *)bufferStartOffset);
     sizeOfLastItem = sizeof(Particle::_indexOfNodeThatItIsOccupying);
 
@@ -209,7 +209,7 @@ void ParticleSsbo::ConfigureRender(unsigned int renderProgramId, unsigned int dr
     bufferStartOffset += sizeOfLastItem;
     vertexArrayIndex++;
     glEnableVertexAttribArray(vertexArrayIndex);
-    glVertexAttribPointer(vertexArrayIndex, numItems, itemType, GL_FALSE, bytesPerStep,
+    glVertexAttribIPointer(vertexArrayIndex, numItems, itemType, bytesPerStep,
         (void *)bufferStartOffset);
     sizeOfLastItem = sizeof(Particle::_isActive);
 

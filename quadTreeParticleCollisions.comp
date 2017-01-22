@@ -51,7 +51,7 @@ struct Particle
     int _collisionCountThisFrame;
     float _mass;
     float _radiusOfInfluence;
-    unsigned int _indexOfNodeThatItIsOccupying;
+    uint _indexOfNodeThatItIsOccupying;
     int _isActive;
 };
 
@@ -196,7 +196,7 @@ void main()
         return;
     }
 
-    AllParticles[particleIndex]._collisionCountThisFrame = 1;
+    AllParticles[particleIndex]._collisionCountThisFrame = 3;
     AllParticles[particleIndex]._indexOfNodeThatItIsOccupying = 13;
 
     Particle p = AllParticles[particleIndex];

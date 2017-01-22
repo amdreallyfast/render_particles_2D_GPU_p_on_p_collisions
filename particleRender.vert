@@ -69,9 +69,9 @@ void main()
         // AllParticles[particleIndex]._collisionCountThisFrame = 7 --> collisionCountThisFrame == 1088421888 --> 0b1000000111000000000000000000000
         // AllParticles[particleIndex]._collisionCountThisFrame = 1 --> collisionCountThisFrame == 1065353216 --> 0b0111111100000000000000000000000
         //                            1075838976
-        //if (collisionCountThisFrame == 1065353216)
+        if (collisionCountThisFrame == 3)
         //if (mass == 0.1f)
-        if (indexOfNodeThatItIsOccupying == 13)
+        //if (indexOfNodeThatItIsOccupying == 13)
         {
             particleColor = vec4(0.0f, 1.0f, 0.0f, 1.0f);
         }

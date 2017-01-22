@@ -419,7 +419,7 @@ void UpdateAllTheThings()
     for (size_t i = 0; i < MAX_PARTICLE_COUNT; i++)
     {
         Particle &p = objPtr[i];
-        if (p._collisionCountThisFrame != 1)
+        if (p._collisionCountThisFrame != 3)
         {
             printf("");
         }
