@@ -424,7 +424,7 @@ void UpdateAllTheThings()
             printf("");
         }
     }
-
+     
     glUnmapBuffer(GL_COPY_WRITE_BUFFER);
     glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
     glBindBuffer(GL_COPY_READ_BUFFER, 0);
