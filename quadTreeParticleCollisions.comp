@@ -82,7 +82,31 @@ layout (std430) buffer ParticleBuffer
 };
 
 
-// TODO: header
+/*-----------------------------------------------------------------------------------------------
+Description:
+    If the distance between the two particles is close enough, then an elastic collision is 
+    calculated.  Only the first particle's values are changed.  The second particle is being 
+    handled by another shader invocation.  Rather than immediately change the 1st particle's 
+    velocity (there may be multiple collisions in one frame), the applied force of the second on 
+    the first is calculated.
+
+    Note: For an elastic collision between two particles of equal mass, the velocities of the 
+    two will be exchanged.  I could use this simplified idea for this demo, but I want to 
+    eventually have the option of different masses of particles, so I will use the general 
+    case elastic collision calculations (bottom of page at link).
+    http://hyperphysics.phy-astr.gsu.edu/hbase/colsta.html
+
+    for elastic collisions between two masses (ignoring rotation because these particles are 
+    points), use the calculations from this article (I followed them on paper too and it 
+    seems legit)
+    http://www.gamasutra.com/view/feature/3015/pool_hall_lessons_fast_accurate_.php?page=3
+
+Parameters:
+    p1Index     Index into AllParticles array for particle to change.
+    p2Index     Index into AllParticles array for particle to check against.
+Returns:    None
+Creator:    John Cox (1-25-2017)
+-----------------------------------------------------------------------------------------------*/
 uniform float uInverseDeltaTimeSec;
 void ParticleCollisionP1WithP2(uint p1Index, uint p2Index)
 {
@@ -100,7 +124,7 @@ void ParticleCollisionP1WithP2(uint p1Index, uint p2Index)
     vec4 p1ToP2 = p1._pos - p2._pos;
 
     // partial pythagorean theorem
-    float distanceBetweenSqr = (p1ToP2.x * p1ToP2.x) + (p1ToP2.y * p1ToP2.y);
+    float distanceBetweenSqr = dot(p1ToP2, p1ToP2);
 
     float minDistanceForCollisionSqr = (p1._radiusOfInfluence + p2._radiusOfInfluence);
     minDistanceForCollisionSqr = minDistanceForCollisionSqr * minDistanceForCollisionSqr;
@@ -111,39 +135,26 @@ void ParticleCollisionP1WithP2(uint p1Index, uint p2Index)
         return;
     }
 
-//    // elastic collision with conservation of momentum
-//    // Note: For an elastic collision between two particles of equal mass, the velocities of the 
-//    // two will be exchanged.  I could use this simplified idea for this demo, but I want to 
-//    // eventually have the option of different masses of particles, so I will use the general 
-//    // case elastic collision calculations (bottom of page at link).
-//    // http://hyperphysics.phy-astr.gsu.edu/hbase/colsta.html
-//
-//    // for elastic collisions between two masses (ignoring rotation because these particles are 
-//    // points), use the calculations from this article (I followed them on paper too and it 
-//    // seems legit)
-//    // http://www.gamasutra.com/view/feature/3015/pool_hall_lessons_fast_accurate_.php?page=3
-//
-//    vec4 normalizedLineOfContact = inversesqrt(distanceBetweenSqr) * p1ToP2;
-//
-//    // ??what else do I call these??
-//    // Note: I don't have an intuitive understanding of this calculation, but it works.  If I 
-//    // understood it better, then I could write better comments, but I don't, so I'm keeping it 
-//    // the way that I found in the gamasutra article.
-//    float a1 = dot(p1._vel, p1ToP2);
-//    float a2 = dot(p2._vel, p1ToP2);
-//    float fraction = (2.0f * (a1 - a2)) / (p1._mass + p2._mass);
-//    vec4 p1VelocityPrime = p1._vel - (fraction * p2._mass) * normalizedLineOfContact;
-//
-//    // delta momentum (impulse) = force * delta time
-//    // therefore force = delta momentum / delta time
-//    vec4 p1InitialMomentum = p1._vel * p1._mass;
-//    vec4 p1FinalMomentum = p1VelocityPrime * p1._mass;
-//    vec4 p1Force = (p1FinalMomentum - p1InitialMomentum) * uInverseDeltaTimeSec;
-//    
-//    // rathering than writing back the whole particle over and over for each call to this 
-//    // function, just write the values that need to be written
-//    AllParticles[p1Index]._netForceThisFrame += p1Force;
-    AllParticles[p1Index]._collisionCountThisFrame += 1;
+    vec4 normalizedLineOfContact = inversesqrt(distanceBetweenSqr) * p1ToP2;
+
+    // ??what else do I call these??
+    // Note: I don't have an intuitive understanding of this calculation, but it works.  If I 
+    // understood it better, then I could write better comments, but I don't, so I'm keeping it 
+    // the way that I found in the gamasutra article.
+    float a1 = dot(p1._vel, p1ToP2);
+    float a2 = dot(p2._vel, p1ToP2);
+    float fraction = (2.0f * (a1 - a2)) / (p1._mass + p2._mass);
+    vec4 p1VelocityPrime = p1._vel - (fraction * p2._mass) * normalizedLineOfContact;
+
+    // delta momentum (impulse) = force * delta time
+    // therefore force = delta momentum / delta time
+    vec4 p1InitialMomentum = p1._vel * p1._mass;
+    vec4 p1FinalMomentum = p1VelocityPrime * p1._mass;
+    vec4 p1Force = (p1FinalMomentum - p1InitialMomentum) * uInverseDeltaTimeSec;
+    
+    // rathering than writing back the whole particle over and over for each call to this 
+    // function, just write the values that need to be written
+    AllParticles[p1Index]._netForceThisFrame += p1Force;
 }
 
 /*-----------------------------------------------------------------------------------------------
@@ -158,20 +169,44 @@ Creator:    John Cox (1-3-2017)
 -----------------------------------------------------------------------------------------------*/
 void ParticleCollisionsWithinNode(uint particleIndex, uint nodeIndex)
 {
+    // MUST perform this condition check or else the "node._numCurrentParticles - 1" later could 
+    // result in a uint being assigned -1, which is very very big
+    if (AllNodes[nodeIndex]._numCurrentParticles == 0)
+    {
+        return;
+    }
+
     ParticleQuadTreeNode node = AllNodes[nodeIndex];
-    
     for (uint pCount = 0; pCount < node._numCurrentParticles - 1; pCount++)
     {
+        //AllParticles[particleIndex]._collisionCountThisFrame += 1;
+        
         uint otherParticleIndex = node._indicesForContainedParticles[pCount];
-        if (otherParticleIndex < 0 || (otherParticleIndex > (16384 - 1)))
+        if (otherParticleIndex >= uMaxParticles)
         {
+            // it may be an uninitialized -1 index
             continue;
         }
 
-        AllParticles[particleIndex]._collisionCountThisFrame += 1;
-//
-//        ParticleCollisionP1WithP2(particleIndex, otherParticleIndex);
+//        AllParticles[particleIndex]._collisionCountThisFrame += 1;
+
+        ParticleCollisionP1WithP2(particleIndex, otherParticleIndex);
     }
+
+//    //if (node._numCurrentParticles == -1)
+//    if (node._numCurrentParticles < 25)
+//    {
+//        AllParticles[particleIndex]._collisionCountThisFrame = 15;
+//    }
+//    //else if (node._numCurrentParticles > 100)
+//    else if (node._numCurrentParticles < 50)
+//    {
+//        AllParticles[particleIndex]._collisionCountThisFrame = 30;
+//    }
+//    else
+//    {
+//        AllParticles[particleIndex]._collisionCountThisFrame = 5;
+//    }
 }
 
 // TODO: header
@@ -196,8 +231,8 @@ void main()
         return;
     }
 
-    AllParticles[particleIndex]._collisionCountThisFrame = 3;
-    AllParticles[particleIndex]._indexOfNodeThatItIsOccupying = 13;
+//    AllParticles[particleIndex]._collisionCountThisFrame = 3;
+//    AllParticles[particleIndex]._indexOfNodeThatItIsOccupying = 13;
 
     Particle p = AllParticles[particleIndex];
 
@@ -206,6 +241,7 @@ void main()
         return;
     }
 
-    //ParticleCollisionsWithinNode(particleIndex, p._indexOfNodeThatItIsOccupying);
+    ParticleCollisionsWithinNode(particleIndex, p._indexOfNodeThatItIsOccupying);
+    //ParticleCollisionsWithinNode(particleIndex, 0);
 }
 

@@ -397,40 +397,54 @@ void UpdateAllTheThings()
     // (for this particle region and the emitters' min-max spawn velocities) at ~45,000 active 
     // particles in one moment.
     // Also Note: 50 easily maxes out the maximuum 100,000 total particles active at one time.
-    gpParticleReseter->ResetParticles(20);
+    gpParticleReseter->ResetParticles(5);
     gpParticleUpdater->Update(deltaTimeSec);
 
     gpQuadTreeReseter->ResetQuadTree();
     gpQuadTreePopulater->PopulateTree();
+
+
+    ////GLuint bufferSizeBytes = sizeof(Particle) * MAX_PARTICLE_COUNT;
+    //GLuint bufferSizeBytes = sizeof(ParticleQuadTreeNode) * ParticleQuadTree::_MAX_NODES;
+    //GLuint copyBufferId;
+    //glGenBuffers(1, &copyBufferId);
+    //glBindBuffer(GL_COPY_WRITE_BUFFER, copyBufferId);
+    //glBufferData(GL_COPY_WRITE_BUFFER, bufferSizeBytes, 0, GL_DYNAMIC_COPY);
+    ////glBindBuffer(GL_COPY_READ_BUFFER, gpParticleBuffer->BufferId());
+    //glBindBuffer(GL_COPY_READ_BUFFER, gpQuadTreeBuffer->BufferId());
+    //glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, bufferSizeBytes);
+    //void *bufferPtr = glMapBuffer(GL_COPY_WRITE_BUFFER, GL_READ_ONLY);
+    ////Particle *objPtr = static_cast<Particle *>(bufferPtr);
+    //ParticleQuadTreeNode *objPtr = static_cast<ParticleQuadTreeNode *>(bufferPtr);
+    //
+    ////for (size_t i = 0; i < MAX_PARTICLE_COUNT; i++)
+    ////{
+    ////    Particle &p = objPtr[i];
+    ////    if (p._indexOfNodeThatItIsOccupying >= MAX_PARTICLE_COUNT)
+    ////    {
+    ////        printf("");
+    ////    }
+    ////}
+    //for (size_t i = 0; i < ParticleQuadTree::_MAX_NODES; i++)
+    //{
+    //    ParticleQuadTreeNode &node = objPtr[i];
+    //    if (node._numCurrentParticles == -1 ||
+    //        node._numCurrentParticles > ParticleQuadTreeNode::MAX_PARTICLES_PER_QUAD_TREE_NODE)
+    //    {
+    //        printf("");
+    //    }
+    //}
+
+    //glUnmapBuffer(GL_COPY_WRITE_BUFFER);
+    //glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
+    //glBindBuffer(GL_COPY_READ_BUFFER, 0);
+    //glDeleteBuffers(1, &copyBufferId);
+
+    
+
+
     gpQuadTreeParticleCollider->Update(deltaTimeSec);
     gpQuadTreeGeometryGenerator->GenerateGeometry();
-
-
-    GLuint bufferSizeBytes = sizeof(Particle) * MAX_PARTICLE_COUNT;
-    GLuint copyBufferId;
-    glGenBuffers(1, &copyBufferId);
-    glBindBuffer(GL_COPY_WRITE_BUFFER, copyBufferId);
-    glBufferData(GL_COPY_WRITE_BUFFER, bufferSizeBytes, 0, GL_DYNAMIC_COPY);
-    glBindBuffer(GL_COPY_READ_BUFFER, gpParticleBuffer->BufferId());
-    glCopyBufferSubData(GL_COPY_READ_BUFFER, GL_COPY_WRITE_BUFFER, 0, 0, bufferSizeBytes);
-    void *bufferPtr = glMapBuffer(GL_COPY_WRITE_BUFFER, GL_READ_ONLY);
-    Particle *objPtr = static_cast<Particle *>(bufferPtr);
-    
-    for (size_t i = 0; i < MAX_PARTICLE_COUNT; i++)
-    {
-        Particle &p = objPtr[i];
-        if (p._collisionCountThisFrame != 3)
-        {
-            printf("");
-        }
-    }
-     
-    glUnmapBuffer(GL_COPY_WRITE_BUFFER);
-    glBindBuffer(GL_COPY_WRITE_BUFFER, 0);
-    glBindBuffer(GL_COPY_READ_BUFFER, 0);
-    glDeleteBuffers(1, &copyBufferId);
-
-
 
     // tell glut to call this display() function again on the next iteration of the main loop
     // Note: https://www.opengl.org/discussion_boards/showthread.php/168717-I-dont-understand-what-glutPostRedisplay()-does
@@ -655,7 +669,7 @@ int main(int argc, char *argv[])
     glutInitContextProfile(GLUT_CORE_PROFILE);
 
     // enable this for automatic message reporting (see OpenGlErrorHandling.cpp)
-#define DEBUG
+//#define DEBUG
 #ifdef DEBUG
     glutInitContextFlags(GLUT_DEBUG);
 #endif

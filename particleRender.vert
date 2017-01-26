@@ -36,49 +36,49 @@ void main()
         float mid = 15;
         float max = 30;
     
-//        // I know that "collision count" is an int, but make a float out of it for the sake of 
-//        // these calculation
-//        float value = collisionCountThisFrame;
-//        //float value = 15;
-//        if (value < mid)
-//        {
-//            // low - medium velocity => linearly blend blue and green
-//            float fraction = (value - min) / (mid - min);
-//
-//            // 0 collisions => all blue
-//            // 14 collisions => all green
-//            blue = (1.0f - fraction);
-//            green = fraction;
-//        }
-//        else
-//        {
-//            // medium - high velocity => linearly blend green and red
-//            float fraction = (value - mid) / (max - mid);
-//
-//            // 15 collisions => all green
-//            // 30+ collisions => all red
-//            green = (1.0f - fraction);
-//            red = fraction;
-//        }
-//
-//        particleColor = vec4(red, green, blue, 1.0f);
-        
-        //                            2147483647
-        //
-        // AllParticles[particleIndex]._collisionCountThisFrame = 8 --> collisionCountThisFrame == 1090519040 --> 0b1000001000000000000000000000000
-        // AllParticles[particleIndex]._collisionCountThisFrame = 7 --> collisionCountThisFrame == 1088421888 --> 0b1000000111000000000000000000000
-        // AllParticles[particleIndex]._collisionCountThisFrame = 1 --> collisionCountThisFrame == 1065353216 --> 0b0111111100000000000000000000000
-        //                            1075838976
-        if (collisionCountThisFrame == 3)
-        //if (mass == 0.1f)
-        //if (indexOfNodeThatItIsOccupying == 13)
+        // I know that "collision count" is an int, but make a float out of it for the sake of 
+        // these calculation
+        float value = collisionCountThisFrame;
+        //float value = 15;
+        if (value < mid)
         {
-            particleColor = vec4(0.0f, 1.0f, 0.0f, 1.0f);
+            // low - medium velocity => linearly blend blue and green
+            float fraction = (value - min) / (mid - min);
+
+            // 0 collisions => all blue
+            // 14 collisions => all green
+            blue = (1.0f - fraction);
+            green = fraction;
         }
         else
         {
-            particleColor = vec4(0.0f, 1.0f, 1.0f, 1.0f);
+            // medium - high velocity => linearly blend green and red
+            float fraction = (value - mid) / (max - mid);
+
+            // 15 collisions => all green
+            // 30+ collisions => all red
+            green = (1.0f - fraction);
+            red = fraction;
         }
+
+        particleColor = vec4(red, green, blue, 1.0f);
+        
+//        //                            2147483647
+//        //
+//        // AllParticles[particleIndex]._collisionCountThisFrame = 8 --> collisionCountThisFrame == 1090519040 --> 0b1000001000000000000000000000000
+//        // AllParticles[particleIndex]._collisionCountThisFrame = 7 --> collisionCountThisFrame == 1088421888 --> 0b1000000111000000000000000000000
+//        // AllParticles[particleIndex]._collisionCountThisFrame = 1 --> collisionCountThisFrame == 1065353216 --> 0b0111111100000000000000000000000
+//        //                            1075838976
+//        if (collisionCountThisFrame == 3)
+//        //if (mass == 0.1f)
+//        //if (indexOfNodeThatItIsOccupying == 13)
+//        {
+//            particleColor = vec4(0.0f, 1.0f, 0.0f, 1.0f);
+//        }
+//        else
+//        {
+//            particleColor = vec4(0.0f, 1.0f, 1.0f, 1.0f);
+//        }
 
         // active => opaque (alpha = 1) white
         //particleColor = vec4(1.0f, 1.0f, 1.0f, 1.0f);
