@@ -241,7 +241,86 @@ void main()
         return;
     }
 
-    ParticleCollisionsWithinNode(particleIndex, p._indexOfNodeThatItIsOccupying);
-    //ParticleCollisionsWithinNode(particleIndex, 0);
+    uint nodeIndex = p._indexOfNodeThatItIsOccupying;
+    ParticleCollisionsWithinNode(particleIndex, nodeIndex);
+    
+    // check against all 8 neighbors
+    ParticleQuadTreeNode node = AllNodes[nodeIndex];
+
+    float x = p._pos.x;
+    float y = p._pos.y;
+    float r = p._radiusOfInfluence;
+
+    // sin(45) == cos(45) == sqrt(2) / 2
+    // Note: The particle's region of influence is circular.  Use a radius value modified by 
+    // sin(45) to check whether the diagonal radius extends into a neighbor.
+    float sqrt2Over2 = 0.70710678118f;
+    float diagonalR = p._radiusOfInfluence * sqrt2Over2;
+
+    // remember that y increases from top to bottom (y = 0 at top, y = 1 at bottom)
+    bool xWithinThisNode = (x > node._leftEdge) && (x < node._rightEdge);
+    bool xLeft = x - r < node._leftEdge;
+    bool xRight = x + r > node._rightEdge;
+    bool xDiagonalLeft = x - diagonalR < node._leftEdge;
+    bool xDiagonalRight = x + diagonalR > node._leftEdge;
+
+    bool yWithinThisNode = (y > node._topEdge) && (y < node._bottomEdge);
+    bool yTop = y - r < node._topEdge;
+    bool yBottom = y + r > node._bottomEdge;
+    bool yDiagonalTop = y - diagonalR < node._topEdge;
+    bool yDiagonalBottom = y + diagonalR > node._bottomEdge;
+
+    bool topLeft = xDiagonalLeft && yDiagonalTop;
+    bool top = xWithinThisNode && yTop;
+    bool topRight = xDiagonalRight && yDiagonalTop;
+    bool right = xRight && yWithinThisNode;
+    bool bottomRight = xDiagonalRight && yDiagonalBottom;
+    bool bottom = xWithinThisNode && yBottom;
+    bool bottomLeft = xDiagonalLeft && yDiagonalBottom;
+    bool left = xLeft && yWithinThisNode;
+
+    // Note: If a particle is in a corner of a small particle region, it is possible for its 
+    // region of influence to extend into multiple neighbors, so just use if(...) and not 
+    // else if(...).
+    if (topLeft)
+    {
+        ParticleCollisionsWithinNode(particleIndex, node._neighborIndexTopLeft);
+    }
+
+    if (top)
+    {
+        ParticleCollisionsWithinNode(particleIndex, node._neighborIndexTop);
+    }
+
+    if (topRight)
+    {
+        ParticleCollisionsWithinNode(particleIndex, node._neighborIndexTopRight);
+    }
+
+    if (right)
+    {
+        ParticleCollisionsWithinNode(particleIndex, node._neighborIndexRight);
+    }
+
+    if (bottomRight)
+    {
+        ParticleCollisionsWithinNode(particleIndex, node._neighborIndexBottomRight);
+    }
+
+    if (bottom)
+    {
+        ParticleCollisionsWithinNode(particleIndex, node._neighborIndexBottom);
+    }
+
+    if (bottomLeft)
+    {
+        ParticleCollisionsWithinNode(particleIndex, node._neighborIndexBottomLeft);
+    }
+
+    if (left)
+    {
+        ParticleCollisionsWithinNode(particleIndex, node._neighborIndexLeft);
+    }
+
 }
 
